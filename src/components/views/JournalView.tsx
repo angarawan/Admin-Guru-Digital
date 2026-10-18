@@ -22,6 +22,7 @@ interface JournalViewProps {
   settings: AppSettings;
   onSaveJournal: (journal: TeachingJournal) => Promise<void>;
   onDeleteJournal: (id: string) => Promise<void>;
+  onBatchDeleteJournals?: (ids: string[]) => Promise<void>;
 }
 
 export const JournalView: React.FC<JournalViewProps> = ({
@@ -31,9 +32,11 @@ export const JournalView: React.FC<JournalViewProps> = ({
   settings,
   onSaveJournal,
   onDeleteJournal,
+  onBatchDeleteJournals,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editingJournal, setEditingJournal] = useState<TeachingJournal | null>(null);
@@ -143,6 +146,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
   const handleDelete = async (journal: TeachingJournal) => {
     if (confirm(`Hapus jurnal pertemuan "${journal.topic}" tanggal ${journal.date}?`)) {
       await onDeleteJournal(journal.id);
+      setSelectedIds((prev) => prev.filter((id) => id !== journal.id));
     }
   };
 
@@ -154,6 +158,38 @@ export const JournalView: React.FC<JournalViewProps> = ({
       j.method.toLowerCase().includes(searchTerm.toLowerCase());
     return matchClass && matchSearch;
   });
+
+  const isAllSelected = filteredJournals.length > 0 && filteredJournals.every((j) => selectedIds.includes(j.id));
+  const isSomeSelected = selectedIds.length > 0 && !isAllSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredJournals.map((j) => j.id));
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    if (confirm(`Apakah Anda yakin ingin menghapus ${count} jurnal mengajar yang dicentang?`)) {
+      if (onBatchDeleteJournals) {
+        await onBatchDeleteJournals(selectedIds);
+      } else {
+        for (const id of selectedIds) {
+          await onDeleteJournal(id);
+        }
+      }
+      setSelectedIds([]);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -181,21 +217,37 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Filter Kelas:</span>
-          <select
-            value={selectedClassFilter}
-            onChange={(e) => setSelectedClassFilter(e.target.value)}
-            className="text-xs border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
-          >
-            <option value="all">Semua Kelas ({journals.length})</option>
-            {classes.map((cls) => (
-              <option key={cls.id} value={cls.id}>
-                {cls.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+          <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isAllSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = isSomeSelected;
+              }}
+              onChange={handleToggleSelectAll}
+              className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+              title="Centang untuk memilih/menghapus semua jurnal"
+            />
+            <span>Centang Semua</span>
+          </label>
+          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Filter Kelas:</span>
+            <select
+              value={selectedClassFilter}
+              onChange={(e) => setSelectedClassFilter(e.target.value)}
+              className="text-xs border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              <option value="all">Semua Kelas ({journals.length})</option>
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="relative w-full sm:w-72">
@@ -210,18 +262,70 @@ export const JournalView: React.FC<JournalViewProps> = ({
         </div>
       </div>
 
+      {/* Bulk Delete Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl text-xs animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-rose-900 dark:text-rose-200">
+              {selectedIds.length} jurnal mengajar dicentang
+            </span>
+            <span className="text-slate-400">·</span>
+            <span className="text-slate-600 dark:text-slate-400">
+              dari total {filteredJournals.length} jurnal
+            </span>
+            <span className="text-slate-400">·</span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline font-medium"
+            >
+              Batal Pilihan
+            </button>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleToggleSelectAll}
+              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs shadow-2xs transition-colors"
+            >
+              {isAllSelected ? 'Hapus Centang Semua' : `Centang Semua (${filteredJournals.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-xs transition-colors text-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Hapus {selectedIds.length === filteredJournals.length ? 'Semua Jurnal' : `${selectedIds.length} Jurnal Terpilih`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Journals List */}
       <div className="space-y-3">
         {filteredJournals.length > 0 ? (
           filteredJournals.map((jr) => {
             const cls = classes.find((c) => c.id === jr.classId);
+            const isSelected = selectedIds.includes(jr.id);
             return (
               <div
                 key={jr.id}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:shadow-xs transition-all p-4 space-y-3"
+                className={`rounded-xl border transition-all p-4 space-y-3 ${
+                  isSelected
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 shadow-2xs hover:shadow-xs'
+                }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
                   <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggleSelect(jr.id)}
+                      className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600 mr-1"
+                      title="Centang jurnal ini"
+                    />
                     <span className="text-xs font-bold px-2 py-0.5 bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 rounded">
                       {cls?.name || jr.classId}
                     </span>

@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   AlertCircle,
   FileCheck2,
+  Trash2,
 } from 'lucide-react';
 import {
   Student,
@@ -25,6 +26,7 @@ interface AttendanceViewProps {
   settings: AppSettings;
   existingAttendance: AttendanceRecord[];
   onSaveAttendanceBatch: (records: AttendanceRecord[]) => Promise<void>;
+  onBatchDeleteAttendance?: (ids: string[]) => Promise<void>;
 }
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({
@@ -34,6 +36,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   settings,
   existingAttendance,
   onSaveAttendanceBatch,
+  onBatchDeleteAttendance,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -42,6 +45,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
   const [subject, setSubject] = useState<string>(settings.subject || 'Matematika');
   const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   // Active attendance state for students in selected class
   const [studentStatuses, setStudentStatuses] = useState<
@@ -99,6 +103,73 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       };
     });
     setStudentStatuses(updated);
+  };
+
+  const isAllSelected = classStudents.length > 0 && classStudents.every((s) => selectedStudentIds.includes(s.id));
+  const isSomeSelected = selectedStudentIds.length > 0 && !isAllSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedStudentIds([]);
+    } else {
+      setSelectedStudentIds(classStudents.map((s) => s.id));
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkSetStatus = (status: AttendanceStatus) => {
+    if (selectedStudentIds.length === 0) return;
+    setStudentStatuses((prev) => {
+      const next = { ...prev };
+      selectedStudentIds.forEach((sid) => {
+        next[sid] = {
+          ...next[sid],
+          status,
+        };
+      });
+      return next;
+    });
+  };
+
+  const handleDeleteSelectedAttendance = async () => {
+    if (selectedStudentIds.length === 0) return;
+    const count = selectedStudentIds.length;
+    if (confirm(`Apakah Anda yakin ingin menghapus / mengosongkan data absensi untuk ${count} murid yang dicentang pada tanggal ${selectedDate}?`)) {
+      // Find existing record IDs for selected students
+      const recordIdsToDelete = existingAttendance
+        .filter(
+          (a) =>
+            a.date === selectedDate &&
+            a.classId === selectedClassId &&
+            a.period === selectedPeriod &&
+            selectedStudentIds.includes(a.studentId)
+        )
+        .map((a) => a.id);
+
+      if (recordIdsToDelete.length > 0 && onBatchDeleteAttendance) {
+        await onBatchDeleteAttendance(recordIdsToDelete);
+      }
+
+      // Reset in local state
+      setStudentStatuses((prev) => {
+        const next = { ...prev };
+        selectedStudentIds.forEach((sid) => {
+          next[sid] = {
+            status: 'H',
+            notes: '',
+          };
+        });
+        return next;
+      });
+
+      setSelectedStudentIds([]);
+      setSaveSuccessMessage(`${count} data absensi murid berhasil dihapus/dikosongkan.`);
+    }
   };
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
@@ -321,6 +392,81 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         </div>
       </div>
 
+      {/* Bulk Delete & Action Bar */}
+      {selectedStudentIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl text-xs animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-rose-900 dark:text-rose-200">
+              {selectedStudentIds.length} murid dicentang
+            </span>
+            <span className="text-slate-400">·</span>
+            <span className="text-slate-600 dark:text-slate-400">
+              dari total {classStudents.length} murid
+            </span>
+            <span className="text-slate-400">·</span>
+            <button
+              type="button"
+              onClick={() => setSelectedStudentIds([])}
+              className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline font-medium"
+            >
+              Batal Pilihan
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+            <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] font-semibold text-slate-500 px-1.5">Set:</span>
+              <button
+                type="button"
+                onClick={() => handleBulkSetStatus('H')}
+                className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300"
+                title="Tandai Hadir untuk yang dicentang"
+              >
+                H
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkSetStatus('S')}
+                className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
+                title="Tandai Sakit untuk yang dicentang"
+              >
+                S
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkSetStatus('I')}
+                className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300"
+                title="Tandai Izin untuk yang dicentang"
+              >
+                I
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBulkSetStatus('A')}
+                className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300"
+                title="Tandai Alpa untuk yang dicentang"
+              >
+                A
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleSelectAll}
+              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs shadow-2xs transition-colors"
+            >
+              {isAllSelected ? 'Hapus Centang Semua' : `Centang Semua (${classStudents.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteSelectedAttendance}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-xs transition-colors text-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Hapus / Kosongkan Absensi {selectedStudentIds.length === classStudents.length ? 'Semua Murid' : `(${selectedStudentIds.length})`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Attendance Form & Students Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800">
@@ -345,6 +491,18 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           <table className="w-full text-left text-xs text-slate-700 dark:text-slate-200">
             <thead className="bg-slate-50/80 dark:bg-slate-800 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
+                <th className="py-2.5 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = isSomeSelected;
+                    }}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                    title="Centang untuk memilih/menghapus semua absensi"
+                  />
+                </th>
                 <th className="py-2.5 px-4 w-12 text-center">No</th>
                 <th className="py-2.5 px-4 w-28">NIS</th>
                 <th className="py-2.5 px-4">Nama Murid</th>
@@ -356,8 +514,25 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               {classStudents.length > 0 ? (
                 classStudents.map((student, idx) => {
                   const current = studentStatuses[student.id] || { status: 'H', notes: '' };
+                  const isSelected = selectedStudentIds.includes(student.id);
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr
+                      key={student.id}
+                      className={`transition-colors ${
+                        isSelected
+                          ? 'bg-blue-50/70 dark:bg-blue-950/40'
+                          : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelect(student.id)}
+                          className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                          title="Pilih murid ini"
+                        />
+                      </td>
                       <td className="py-2.5 px-4 text-center font-mono text-slate-400 dark:text-slate-500 tabular-nums">
                         {idx + 1}
                       </td>

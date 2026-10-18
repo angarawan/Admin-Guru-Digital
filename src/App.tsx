@@ -27,30 +27,39 @@ import {
   saveStudent,
   batchSaveStudents,
   deleteStudent,
+  deleteStudentsBatch,
   getSchedules,
   saveSchedule,
   deleteSchedule,
+  deleteSchedulesBatch,
   getAttendance,
   saveAttendanceBatch,
+  deleteAttendanceBatch,
   getJournals,
   saveJournal,
   deleteJournal,
+  deleteJournalsBatch,
   getKnowledgeAssessments,
   saveKnowledgeAssessmentBatch,
   deleteKnowledgeAssessment,
+  deleteKnowledgeAssessmentsBatch,
   getSkillAssessments,
   saveSkillAssessmentBatch,
   deleteSkillAssessment,
+  deleteSkillAssessmentsBatch,
   getAttitudeAssessments,
   saveAttitudeAssessmentBatch,
   deleteAttitudeAssessment,
+  deleteAttitudeAssessmentsBatch,
   getMentoringJournals,
   resetMentoringJournals,
   saveMentoringJournal,
   deleteMentoringJournal,
+  deleteMentoringJournalsBatch,
   getReflections,
   saveReflection,
   deleteReflection,
+  deleteReflectionsBatch,
   syncAllFromRemote,
   subscribeSyncStatus,
 } from './services/storage';
@@ -266,6 +275,51 @@ export default function App() {
     setReflections(getReflections());
   };
 
+  const handleBatchDeleteStudents = async (ids: string[]) => {
+    await deleteStudentsBatch(ids);
+    setStudents(getStudents());
+  };
+
+  const handleBatchDeleteSchedules = async (ids: string[]) => {
+    await deleteSchedulesBatch(ids);
+    setSchedules(getSchedules());
+  };
+
+  const handleBatchDeleteAttendance = async (ids: string[]) => {
+    await deleteAttendanceBatch(ids);
+    setAttendance(getAttendance());
+  };
+
+  const handleBatchDeleteJournals = async (ids: string[]) => {
+    await deleteJournalsBatch(ids);
+    setJournals(getJournals());
+  };
+
+  const handleBatchDeleteKnowledge = async (ids: string[]) => {
+    await deleteKnowledgeAssessmentsBatch(ids);
+    setKnowledgeAssessments(getKnowledgeAssessments());
+  };
+
+  const handleBatchDeleteSkills = async (ids: string[]) => {
+    await deleteSkillAssessmentsBatch(ids);
+    setSkillAssessments(getSkillAssessments());
+  };
+
+  const handleBatchDeleteAttitude = async (ids: string[]) => {
+    await deleteAttitudeAssessmentsBatch(ids);
+    setAttitudeAssessments(getAttitudeAssessments());
+  };
+
+  const handleBatchDeleteMentoring = async (ids: string[]) => {
+    await deleteMentoringJournalsBatch(ids);
+    setMentoringJournals(getMentoringJournals());
+  };
+
+  const handleBatchDeleteReflections = async (ids: string[]) => {
+    await deleteReflectionsBatch(ids);
+    setReflections(getReflections());
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex transition-colors duration-200">
       {/* Sidebar Navigation */}
@@ -318,6 +372,7 @@ export default function App() {
               onSaveStudent={handleSaveStudent}
               onBatchSaveStudents={handleBatchSaveStudents}
               onDeleteStudent={handleDeleteStudent}
+              onBatchDeleteStudents={handleBatchDeleteStudents}
             />
           )}
 
@@ -329,6 +384,7 @@ export default function App() {
               settings={settings}
               onSaveSchedule={handleSaveSchedule}
               onDeleteSchedule={handleDeleteSchedule}
+              onBatchDeleteSchedules={handleBatchDeleteSchedules}
             />
           )}
 
@@ -340,6 +396,7 @@ export default function App() {
               settings={settings}
               existingAttendance={attendance}
               onSaveAttendanceBatch={handleSaveAttendanceBatch}
+              onBatchDeleteAttendance={handleBatchDeleteAttendance}
             />
           )}
 
@@ -351,6 +408,7 @@ export default function App() {
               settings={settings}
               onSaveJournal={handleSaveJournal}
               onDeleteJournal={handleDeleteJournal}
+              onBatchDeleteJournals={handleBatchDeleteJournals}
             />
           )}
 
@@ -362,6 +420,7 @@ export default function App() {
               existingAssessments={knowledgeAssessments}
               onSaveAssessmentBatch={handleSaveKnowledgeBatch}
               onDeleteAssessment={handleDeleteKnowledge}
+              onBatchDeleteAssessments={handleBatchDeleteKnowledge}
             />
           )}
 
@@ -373,6 +432,7 @@ export default function App() {
               existingAssessments={skillAssessments}
               onSaveAssessmentBatch={handleSaveSkillBatch}
               onDeleteAssessment={handleDeleteSkill}
+              onBatchDeleteAssessments={handleBatchDeleteSkills}
             />
           )}
 
@@ -384,6 +444,7 @@ export default function App() {
               existingAssessments={attitudeAssessments}
               onSaveAssessmentBatch={handleSaveAttitudeBatch}
               onDeleteAssessment={handleDeleteAttitude}
+              onBatchDeleteAssessments={handleBatchDeleteAttitude}
             />
           )}
 
@@ -395,6 +456,7 @@ export default function App() {
               settings={settings}
               onSaveJournal={handleSaveMentoringJournal}
               onDeleteJournal={handleDeleteMentoringJournal}
+              onBatchDeleteJournals={handleBatchDeleteMentoring}
               onResetDefaultJournals={() => {
                 resetMentoringJournals();
                 setMentoringJournals(getMentoringJournals());
@@ -410,6 +472,7 @@ export default function App() {
               settings={settings}
               onSaveReflection={handleSaveReflection}
               onDeleteReflection={handleDeleteReflection}
+              onBatchDeleteReflections={handleBatchDeleteReflections}
             />
           )}
 

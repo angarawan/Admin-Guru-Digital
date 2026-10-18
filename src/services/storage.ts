@@ -260,6 +260,20 @@ export async function deleteStudent(id: string): Promise<void> {
   }
 }
 
+export async function deleteStudentsBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getStudents().filter((s) => !idSet.has(s.id));
+  setStored(STORAGE_KEYS.STUDENTS, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Data_Murid', id);
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // SCHEDULE (JADWAL MENGAJAR)
 // -------------------------------------------------------------
@@ -297,6 +311,20 @@ export async function deleteSchedule(id: string): Promise<void> {
   const settings = getSettings();
   if (settings.appsScriptUrl) {
     await deleteRowRemote(settings.appsScriptUrl, 'Jadwal_Mengajar', id);
+  }
+}
+
+export async function deleteSchedulesBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getSchedules().filter((s) => !idSet.has(s.id));
+  setStored(STORAGE_KEYS.SCHEDULES, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Jadwal_Mengajar', id);
+    }
   }
 }
 
@@ -346,6 +374,29 @@ export async function saveAttendanceBatch(records: AttendanceRecord[]): Promise<
   }
 }
 
+export async function deleteAttendance(id: string): Promise<void> {
+  const list = getAttendance().filter((a) => a.id !== id);
+  setStored(STORAGE_KEYS.ATTENDANCE, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    await deleteRowRemote(settings.appsScriptUrl, 'Absensi', id);
+  }
+}
+
+export async function deleteAttendanceBatch(ids: string[]): Promise<void> {
+  const set = new Set(ids);
+  const list = getAttendance().filter((a) => !set.has(a.id));
+  setStored(STORAGE_KEYS.ATTENDANCE, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Absensi', id);
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // TEACHING JOURNAL (JURNAL MENGAJAR)
 // -------------------------------------------------------------
@@ -386,6 +437,20 @@ export async function deleteJournal(id: string): Promise<void> {
   }
 }
 
+export async function deleteJournalsBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getJournals().filter((j) => !idSet.has(j.id));
+  setStored(STORAGE_KEYS.JOURNALS, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Jurnal_Mengajar', id);
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // KNOWLEDGE ASSESSMENT (PENILAIAN PENGETAHUAN)
 // -------------------------------------------------------------
@@ -421,6 +486,20 @@ export async function deleteKnowledgeAssessment(id: string): Promise<void> {
   const settings = getSettings();
   if (settings.appsScriptUrl) {
     await deleteRowRemote(settings.appsScriptUrl, 'Nilai_Pengetahuan', id);
+  }
+}
+
+export async function deleteKnowledgeAssessmentsBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getKnowledgeAssessments().filter((k) => !idSet.has(k.id));
+  setStored(STORAGE_KEYS.KNOWLEDGE, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Nilai_Pengetahuan', id);
+    }
   }
 }
 
@@ -484,6 +563,20 @@ export async function deleteSkillAssessment(id: string): Promise<void> {
   }
 }
 
+export async function deleteSkillAssessmentsBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getSkillAssessments().filter((s) => !idSet.has(s.id));
+  setStored(STORAGE_KEYS.SKILLS, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Nilai_Keterampilan', id);
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // ATTITUDE ASSESSMENT (PENILAIAN SIKAP)
 // -------------------------------------------------------------
@@ -520,6 +613,21 @@ export async function deleteAttitudeAssessment(id: string): Promise<void> {
     await deleteRowRemote(settings.appsScriptUrl, 'Nilai_Sikap', id);
   }
 }
+
+export async function deleteAttitudeBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getAttitudeAssessments().filter((a) => !idSet.has(a.id));
+  setStored(STORAGE_KEYS.ATTITUDES, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Nilai_Sikap', id);
+    }
+  }
+}
+export const deleteAttitudeAssessmentsBatch = deleteAttitudeBatch;
 
 // -------------------------------------------------------------
 // MENTORING JOURNAL (JURNAL PENDAMPINGAN)
@@ -570,6 +678,20 @@ export async function deleteMentoringJournal(id: string): Promise<void> {
   }
 }
 
+export async function deleteMentoringJournalsBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getMentoringJournals().filter((m) => !idSet.has(m.id));
+  setStored(STORAGE_KEYS.MENTORING, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Jurnal_Pendampingan', id);
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // REFLECTION CARD (KARTU REFLEKSI)
 // -------------------------------------------------------------
@@ -607,6 +729,20 @@ export async function deleteReflection(id: string): Promise<void> {
   const settings = getSettings();
   if (settings.appsScriptUrl) {
     await deleteRowRemote(settings.appsScriptUrl, 'Kartu_Refleksi', id);
+  }
+}
+
+export async function deleteReflectionsBatch(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  const list = getReflections().filter((r) => !idSet.has(r.id));
+  setStored(STORAGE_KEYS.REFLECTIONS, list);
+
+  const settings = getSettings();
+  if (settings.appsScriptUrl) {
+    for (const id of ids) {
+      await deleteRowRemote(settings.appsScriptUrl, 'Kartu_Refleksi', id);
+    }
   }
 }
 

@@ -33,6 +33,7 @@ interface MentoringJournalViewProps {
   settings: AppSettings;
   onSaveJournal: (journal: MentoringJournal) => Promise<void>;
   onDeleteJournal: (id: string) => Promise<void>;
+  onBatchDeleteJournals?: (ids: string[]) => Promise<void>;
   onResetDefaultJournals?: () => void;
 }
 
@@ -43,10 +44,12 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
   settings,
   onSaveJournal,
   onDeleteJournal,
+  onBatchDeleteJournals,
   onResetDefaultJournals,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -168,6 +171,7 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
   const handleDelete = async (journal: MentoringJournal) => {
     if (confirm(`Hapus jurnal pendampingan nomor ${journal.journalNumber} untuk ${journal.studentName}?`)) {
       await onDeleteJournal(journal.id);
+      setSelectedIds((prev) => prev.filter((id) => id !== journal.id));
     }
   };
 
@@ -179,6 +183,38 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
       j.problemType.toLowerCase().includes(searchTerm.toLowerCase());
     return matchStatus && matchSearch;
   });
+
+  const isAllSelected = filteredJournals.length > 0 && filteredJournals.every((j) => selectedIds.includes(j.id));
+  const isSomeSelected = selectedIds.length > 0 && !isAllSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredJournals.map((j) => j.id));
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    if (confirm(`Apakah Anda yakin ingin menghapus ${count} jurnal pendampingan yang dicentang?`)) {
+      if (onBatchDeleteJournals) {
+        await onBatchDeleteJournals(selectedIds);
+      } else {
+        for (const id of selectedIds) {
+          await onDeleteJournal(id);
+        }
+      }
+      setSelectedIds([]);
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -233,19 +269,35 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
 
       {/* Filter and Search */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Filter Status:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
-          >
-            <option value="all">Semua Status ({journals.length})</option>
-            <option value="Dalam Pendampingan">Dalam Pendampingan</option>
-            <option value="Perlu Tindak Lanjut">Perlu Tindak Lanjut</option>
-            <option value="Selesai">Selesai</option>
-          </select>
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+          <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isAllSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = isSomeSelected;
+              }}
+              onChange={handleToggleSelectAll}
+              className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+              title="Centang untuk memilih/menghapus semua jurnal pendampingan"
+            />
+            <span>Centang Semua</span>
+          </label>
+          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Filter Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="text-xs border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              <option value="all">Semua Status ({journals.length})</option>
+              <option value="Dalam Pendampingan">Dalam Pendampingan</option>
+              <option value="Perlu Tindak Lanjut">Perlu Tindak Lanjut</option>
+              <option value="Selesai">Selesai</option>
+            </select>
+          </div>
         </div>
 
         <div className="relative w-full sm:w-72">
@@ -260,11 +312,52 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
         </div>
       </div>
 
+      {/* Bulk Delete Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl text-xs animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-rose-900 dark:text-rose-200">
+              {selectedIds.length} jurnal pendampingan dicentang
+            </span>
+            <span className="text-slate-400">·</span>
+            <span className="text-slate-600 dark:text-slate-400">
+              dari total {filteredJournals.length} jurnal
+            </span>
+            <span className="text-slate-400">·</span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline font-medium"
+            >
+              Batal Pilihan
+            </button>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleToggleSelectAll}
+              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs shadow-2xs transition-colors"
+            >
+              {isAllSelected ? 'Hapus Centang Semua' : `Centang Semua (${filteredJournals.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-xs transition-colors text-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Hapus {selectedIds.length === filteredJournals.length ? 'Semua Jurnal' : `${selectedIds.length} Jurnal Terpilih`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mentoring Records Grid / Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredJournals.length > 0 ? (
           filteredJournals.map((jr) => {
             const cls = classes.find((c) => c.id === jr.classId);
+            const isSelected = selectedIds.includes(jr.id);
             const statusColors = {
               'Dalam Pendampingan': 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
               'Perlu Tindak Lanjut': 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
@@ -274,13 +367,26 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
             return (
               <div
                 key={jr.id}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:shadow-xs transition-all p-4 space-y-3 flex flex-col justify-between"
+                className={`rounded-xl border transition-all p-4 space-y-3 flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 shadow-2xs hover:shadow-xs'
+                }`}
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                    <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
-                      {jr.journalNumber}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelect(jr.id)}
+                        className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                        title="Centang jurnal pendampingan ini"
+                      />
+                      <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {jr.journalNumber}
+                      </span>
+                    </div>
                     <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${statusColors}`}>
                       {jr.status}
                     </span>

@@ -23,6 +23,7 @@ interface StudentsViewProps {
   onSaveStudent: (student: Student) => Promise<void>;
   onBatchSaveStudents: (students: Student[]) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
+  onBatchDeleteStudents?: (ids: string[]) => Promise<void>;
 }
 
 export const StudentsView: React.FC<StudentsViewProps> = ({
@@ -32,11 +33,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   onSaveStudent,
   onBatchSaveStudents,
   onDeleteStudent,
+  onBatchDeleteStudents,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -119,6 +122,39 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const handleDelete = async (student: Student) => {
     if (confirm(`Apakah Anda yakin ingin menghapus murid "${student.name}" (NIS: ${student.nis})?`)) {
       await onDeleteStudent(student.id);
+      setSelectedIds((prev) => prev.filter((id) => id !== student.id));
+    }
+  };
+
+  const isAllSelected = filteredStudents.length > 0 && filteredStudents.every((s) => selectedIds.includes(s.id));
+  const isSomeSelected = selectedIds.length > 0 && !isAllSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredStudents.map((s) => s.id));
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const count = selectedIds.length;
+    if (confirm(`Apakah Anda yakin ingin menghapus ${count} data murid yang dicentang?`)) {
+      if (onBatchDeleteStudents) {
+        await onBatchDeleteStudents(selectedIds);
+      } else {
+        for (const id of selectedIds) {
+          await onDeleteStudent(id);
+        }
+      }
+      setSelectedIds([]);
     }
   };
 
@@ -301,13 +337,65 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         </div>
       </div>
 
+      {/* Bulk Delete & Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl text-xs animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-rose-900 dark:text-rose-200">
+              {selectedIds.length} murid dicentang
+            </span>
+            <span className="text-slate-400">·</span>
+            <span className="text-slate-600 dark:text-slate-400">
+              dari total {filteredStudents.length} murid
+            </span>
+            <span className="text-slate-400">·</span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline font-medium"
+            >
+              Batal Pilihan
+            </button>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleToggleSelectAll}
+              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs shadow-2xs transition-colors"
+            >
+              {isAllSelected ? 'Hapus Centang Semua' : `Centang Semua (${filteredStudents.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-xs transition-colors text-xs"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Hapus {selectedIds.length === filteredStudents.length ? 'Semua Murid' : `${selectedIds.length} Murid Terpilih`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Students Data Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-700 dark:text-slate-200">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="py-3 px-4 w-12 text-center">No</th>
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = isSomeSelected;
+                    }}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                    title="Centang untuk memilih/menghapus semua murid"
+                  />
+                </th>
+                <th className="py-3 px-3 w-10 text-center">No</th>
                 <th className="py-3 px-4">NIS</th>
                 <th className="py-3 px-4">NISN</th>
                 <th className="py-3 px-4">Nama Murid</th>
@@ -322,9 +410,25 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
               {paginatedStudents.length > 0 ? (
                 paginatedStudents.map((student, idx) => {
                   const studentClass = classes.find((c) => c.id === student.classId);
+                  const isSelected = selectedIds.includes(student.id);
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="py-3 px-4 text-center font-mono text-slate-400 dark:text-slate-500 tabular-nums">
+                    <tr
+                      key={student.id}
+                      className={`transition-colors ${
+                        isSelected
+                          ? 'bg-blue-50/70 dark:bg-blue-950/40'
+                          : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelect(student.id)}
+                          className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                        />
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono text-slate-400 dark:text-slate-500 tabular-nums">
                         {(page - 1) * pageSize + idx + 1}
                       </td>
                       <td className="py-3 px-4 font-mono font-medium text-slate-900 dark:text-white tabular-nums">
