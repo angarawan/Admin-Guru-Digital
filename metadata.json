@@ -1,0 +1,6 @@
+{
+  "name": "Administrasi Guru Digital",
+  "description": "Aplikasi web modern, cepat, dan responsif untuk mengelola administrasi pembelajaran guru dengan integrasi Google Spreadsheet.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
