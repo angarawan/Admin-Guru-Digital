@@ -18,6 +18,7 @@ import {
   HelpCircle,
   Sun,
   Moon,
+  Smartphone,
 } from 'lucide-react';
 import {
   AppSettings,
@@ -28,6 +29,7 @@ import { GOOGLE_APPS_SCRIPT_CODE } from '../../services/googleAppsScriptCode';
 import { pingAppsScript, runSetupSpreadsheetRemote } from '../../services/api';
 import { Modal } from '../ui/Modal';
 import { useTheme } from '../../context/ThemeContext';
+import { PWAInstallButton } from '../ui/PWAInstallModal';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -311,6 +313,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <Moon className="w-3.5 h-3.5" />
                   Gelap
                 </button>
+              </div>
+            </div>
+          </div>
+
+          {/* PWA Mobile Installation Card */}
+          <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Instalasi Aplikasi di HP (Progressive Web App)
+                </h4>
+                <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80">
+                  Pasang aplikasi di layar beranda ponsel (Android / iPhone) agar dapat diakses cepat layaknya aplikasi Play Store / App Store tanpa bilah alamat browser.
+                </p>
+              </div>
+              <div className="shrink-0">
+                <PWAInstallButton />
               </div>
             </div>
           </div>

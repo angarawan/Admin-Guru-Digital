@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { AppSettings, NavigationMenu } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { PWAInstallButton } from '../ui/PWAInstallModal';
 
 interface HeaderProps {
   settings: AppSettings;
@@ -119,6 +120,9 @@ export const Header: React.FC<HeaderProps> = ({
             <Moon className="w-4 h-4 text-slate-600" />
           )}
         </button>
+
+        {/* PWA Install Button */}
+        <PWAInstallButton />
 
         {/* Sync Status Badge / Action */}
         <div className="flex items-center gap-2">
