@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  CheckSquare,
+  CalendarCheck,
   Users,
   Calendar,
   Clock,
@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   AlertCircle,
   FileCheck2,
-  Trash2,
 } from 'lucide-react';
 import {
   Student,
@@ -26,7 +25,6 @@ interface AttendanceViewProps {
   settings: AppSettings;
   existingAttendance: AttendanceRecord[];
   onSaveAttendanceBatch: (records: AttendanceRecord[]) => Promise<void>;
-  onBatchDeleteAttendance?: (ids: string[]) => Promise<void>;
 }
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({
@@ -36,16 +34,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   settings,
   existingAttendance,
   onSaveAttendanceBatch,
-  onBatchDeleteAttendance,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Selection states
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
   const [subject, setSubject] = useState<string>(settings.subject || 'Matematika');
   const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
-  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   // Active attendance state for students in selected class
   const [studentStatuses, setStudentStatuses] = useState<
@@ -103,73 +98,6 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       };
     });
     setStudentStatuses(updated);
-  };
-
-  const isAllSelected = classStudents.length > 0 && classStudents.every((s) => selectedStudentIds.includes(s.id));
-  const isSomeSelected = selectedStudentIds.length > 0 && !isAllSelected;
-
-  const handleToggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedStudentIds([]);
-    } else {
-      setSelectedStudentIds(classStudents.map((s) => s.id));
-    }
-  };
-
-  const handleToggleSelect = (id: string) => {
-    setSelectedStudentIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleBulkSetStatus = (status: AttendanceStatus) => {
-    if (selectedStudentIds.length === 0) return;
-    setStudentStatuses((prev) => {
-      const next = { ...prev };
-      selectedStudentIds.forEach((sid) => {
-        next[sid] = {
-          ...next[sid],
-          status,
-        };
-      });
-      return next;
-    });
-  };
-
-  const handleDeleteSelectedAttendance = async () => {
-    if (selectedStudentIds.length === 0) return;
-    const count = selectedStudentIds.length;
-    if (confirm(`Apakah Anda yakin ingin menghapus / mengosongkan data absensi untuk ${count} murid yang dicentang pada tanggal ${selectedDate}?`)) {
-      // Find existing record IDs for selected students
-      const recordIdsToDelete = existingAttendance
-        .filter(
-          (a) =>
-            a.date === selectedDate &&
-            a.classId === selectedClassId &&
-            a.period === selectedPeriod &&
-            selectedStudentIds.includes(a.studentId)
-        )
-        .map((a) => a.id);
-
-      if (recordIdsToDelete.length > 0 && onBatchDeleteAttendance) {
-        await onBatchDeleteAttendance(recordIdsToDelete);
-      }
-
-      // Reset in local state
-      setStudentStatuses((prev) => {
-        const next = { ...prev };
-        selectedStudentIds.forEach((sid) => {
-          next[sid] = {
-            status: 'H',
-            notes: '',
-          };
-        });
-        return next;
-      });
-
-      setSelectedStudentIds([]);
-      setSaveSuccessMessage(`${count} data absensi murid berhasil dihapus/dikosongkan.`);
-    }
   };
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
@@ -269,7 +197,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-            <CheckSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <CalendarCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             Absensi Murid
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -302,7 +230,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           Pilih Parameter Pembelajaran
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
               Tanggal Pembelajaran
@@ -344,128 +272,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 dark:placeholder-slate-500"
             />
           </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-              Jam Pelajaran Ke-
-            </label>
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(Number(e.target.value))}
-              className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
-            >
-              {periods.map((p) => (
-                <option key={p.period} value={p.period}>
-                  Jam {p.period} ({p.startTime} - {p.endTime})
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
-
-      {/* Realtime Attendance Statistics Counter */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
-        <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-center shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">Total Murid</span>
-          <span className="text-xl font-bold text-slate-800 dark:text-white tabular-nums">{stats.total}</span>
-        </div>
-        <div className="bg-emerald-50/60 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/60 text-center shadow-2xs">
-          <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 block">Hadir (H)</span>
-          <span className="text-xl font-bold text-emerald-800 dark:text-emerald-200 tabular-nums">{stats.hadir}</span>
-        </div>
-        <div className="bg-blue-50/60 dark:bg-blue-950/40 p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 text-center shadow-2xs">
-          <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 block">Sakit (S)</span>
-          <span className="text-xl font-bold text-blue-800 dark:text-blue-200 tabular-nums">{stats.sakit}</span>
-        </div>
-        <div className="bg-amber-50/60 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 text-center shadow-2xs">
-          <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 block">Izin (I)</span>
-          <span className="text-xl font-bold text-amber-800 dark:text-amber-200 tabular-nums">{stats.izin}</span>
-        </div>
-        <div className="bg-rose-50/60 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200 dark:border-rose-900/60 text-center shadow-2xs">
-          <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300 block">Alpa (A)</span>
-          <span className="text-xl font-bold text-rose-800 dark:text-rose-200 tabular-nums">{stats.alpa}</span>
-        </div>
-        <div className="bg-slate-900 dark:bg-slate-800 border border-transparent dark:border-slate-700 text-white p-3 rounded-xl text-center shadow-2xs">
-          <span className="text-[11px] font-medium text-slate-300 dark:text-slate-400 block">Kehadiran</span>
-          <span className="text-xl font-bold text-white tabular-nums">{stats.persentase}%</span>
-        </div>
-      </div>
-
-      {/* Bulk Delete & Action Bar */}
-      {selectedStudentIds.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl text-xs animate-in fade-in duration-150">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-rose-900 dark:text-rose-200">
-              {selectedStudentIds.length} murid dicentang
-            </span>
-            <span className="text-slate-400">·</span>
-            <span className="text-slate-600 dark:text-slate-400">
-              dari total {classStudents.length} murid
-            </span>
-            <span className="text-slate-400">·</span>
-            <button
-              type="button"
-              onClick={() => setSelectedStudentIds([])}
-              className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline font-medium"
-            >
-              Batal Pilihan
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-            <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
-              <span className="text-[10px] font-semibold text-slate-500 px-1.5">Set:</span>
-              <button
-                type="button"
-                onClick={() => handleBulkSetStatus('H')}
-                className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300"
-                title="Tandai Hadir untuk yang dicentang"
-              >
-                H
-              </button>
-              <button
-                type="button"
-                onClick={() => handleBulkSetStatus('S')}
-                className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
-                title="Tandai Sakit untuk yang dicentang"
-              >
-                S
-              </button>
-              <button
-                type="button"
-                onClick={() => handleBulkSetStatus('I')}
-                className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300"
-                title="Tandai Izin untuk yang dicentang"
-              >
-                I
-              </button>
-              <button
-                type="button"
-                onClick={() => handleBulkSetStatus('A')}
-                className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300"
-                title="Tandai Alpa untuk yang dicentang"
-              >
-                A
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={handleToggleSelectAll}
-              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs shadow-2xs transition-colors"
-            >
-              {isAllSelected ? 'Hapus Centang Semua' : `Centang Semua (${classStudents.length})`}
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteSelectedAttendance}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-xs transition-colors text-xs"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Hapus / Kosongkan Absensi {selectedStudentIds.length === classStudents.length ? 'Semua Murid' : `(${selectedStudentIds.length})`}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Attendance Form & Students Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
@@ -491,91 +299,110 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           <table className="w-full text-left text-xs text-slate-700 dark:text-slate-200">
             <thead className="bg-slate-50/80 dark:bg-slate-800 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="py-2.5 px-3 w-10 text-center">
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = isSomeSelected;
-                    }}
-                    onChange={handleToggleSelectAll}
-                    className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
-                    title="Centang untuk memilih/menghapus semua absensi"
-                  />
-                </th>
-                <th className="py-2.5 px-4 w-12 text-center">No</th>
-                <th className="py-2.5 px-4 w-28">NIS</th>
+                <th className="py-2.5 px-3 w-12 text-center">No</th>
                 <th className="py-2.5 px-4">Nama Murid</th>
-                <th className="py-2.5 px-4 text-center w-64">Status Kehadiran</th>
-                <th className="py-2.5 px-4">Keterangan Tambahan</th>
+                <th className="py-2.5 px-1 w-12 text-center text-emerald-700 dark:text-emerald-400 font-bold" title="Hadir (H)">
+                  H
+                </th>
+                <th className="py-2.5 px-1 w-12 text-center text-blue-700 dark:text-blue-400 font-bold" title="Sakit (S)">
+                  S
+                </th>
+                <th className="py-2.5 px-1 w-12 text-center text-amber-700 dark:text-amber-400 font-bold" title="Izin (I)">
+                  I
+                </th>
+                <th className="py-2.5 px-1 w-12 text-center text-rose-700 dark:text-rose-400 font-bold" title="Alpa (A)">
+                  A
+                </th>
+                <th className="py-2.5 px-4 min-w-[160px]">Keterangan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {classStudents.length > 0 ? (
                 classStudents.map((student, idx) => {
                   const current = studentStatuses[student.id] || { status: 'H', notes: '' };
-                  const isSelected = selectedStudentIds.includes(student.id);
                   return (
                     <tr
                       key={student.id}
-                      className={`transition-colors ${
-                        isSelected
-                          ? 'bg-blue-50/70 dark:bg-blue-950/40'
-                          : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/50'
-                      }`}
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors"
                     >
-                      <td className="py-2.5 px-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleSelect(student.id)}
-                          className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
-                          title="Pilih murid ini"
-                        />
-                      </td>
-                      <td className="py-2.5 px-4 text-center font-mono text-slate-400 dark:text-slate-500 tabular-nums">
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-400 dark:text-slate-500 tabular-nums">
                         {idx + 1}
-                      </td>
-                      <td className="py-2.5 px-4 font-mono font-medium text-slate-800 dark:text-slate-200 tabular-nums">
-                        {student.nis}
                       </td>
                       <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">
                         {student.name}
                       </td>
-                      <td className="py-2.5 px-4 text-center">
-                        <div className="inline-flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                          {(['H', 'S', 'I', 'A'] as AttendanceStatus[]).map((st) => {
-                            const isSelected = current.status === st;
-                            const colors = {
-                              H: isSelected ? 'bg-emerald-600 text-white font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400',
-                              S: isSelected ? 'bg-blue-600 text-white font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-blue-700 dark:hover:text-blue-400',
-                              I: isSelected ? 'bg-amber-500 text-white font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-amber-700 dark:hover:text-amber-400',
-                              A: isSelected ? 'bg-rose-600 text-white font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-rose-700 dark:hover:text-rose-400',
-                            }[st];
 
-                            const labels = { H: 'Hadir', S: 'Sakit', I: 'Izin', A: 'Alpa' }[st];
-
-                            return (
-                              <button
-                                key={st}
-                                type="button"
-                                onClick={() => handleStatusChange(student.id, st)}
-                                title={labels}
-                                className={`px-3 py-1 text-xs rounded-md transition-all ${colors}`}
-                              >
-                                {st}
-                              </button>
-                            );
-                          })}
-                        </div>
+                      {/* Kolom Terpisah: H (Hadir) */}
+                      <td className="py-2.5 px-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange(student.id, 'H')}
+                          title={`${student.name}: Hadir (H)`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                            current.status === 'H'
+                              ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-300 dark:ring-emerald-700 font-extrabold'
+                              : 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          H
+                        </button>
                       </td>
-                      <td className="py-2.5 px-4">
+
+                      {/* Kolom Terpisah: S (Sakit) */}
+                      <td className="py-2.5 px-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange(student.id, 'S')}
+                          title={`${student.name}: Sakit (S)`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                            current.status === 'S'
+                              ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300 dark:ring-blue-700 font-extrabold'
+                              : 'text-slate-400 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          S
+                        </button>
+                      </td>
+
+                      {/* Kolom Terpisah: I (Izin) */}
+                      <td className="py-2.5 px-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange(student.id, 'I')}
+                          title={`${student.name}: Izin (I)`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                            current.status === 'I'
+                              ? 'bg-amber-500 text-white shadow-xs ring-2 ring-amber-300 dark:ring-amber-700 font-extrabold'
+                              : 'text-slate-400 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          I
+                        </button>
+                      </td>
+
+                      {/* Kolom Terpisah: A (Alpa) */}
+                      <td className="py-2.5 px-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange(student.id, 'A')}
+                          title={`${student.name}: Alpa (A)`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                            current.status === 'A'
+                              ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-300 dark:ring-rose-700 font-extrabold'
+                              : 'text-slate-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          A
+                        </button>
+                      </td>
+
+                      <td className="py-2.5 px-3">
                         <input
                           type="text"
                           value={current.notes}
                           onChange={(e) => handleNotesChange(student.id, e.target.value)}
-                          placeholder="Catatan surat izin, terlambat, dll..."
-                          className="w-full text-xs px-2.5 py-1 border border-slate-200 dark:border-slate-700 rounded focus:ring-1 focus:ring-blue-500 bg-slate-50/50 dark:bg-slate-800 text-slate-900 dark:text-white dark:placeholder-slate-500"
+                          placeholder="Catatan..."
+                          className="w-full text-xs px-2.5 py-1 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-1 focus:ring-blue-500 bg-slate-50/50 dark:bg-slate-800 text-slate-900 dark:text-white dark:placeholder-slate-500"
                         />
                       </td>
                     </tr>
@@ -583,7 +410,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                  <td colSpan={8} className="py-10 text-center text-slate-400 dark:text-slate-500">
                     <Users className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
                     Belum ada murid aktif yang terdaftar di kelas ini.
                   </td>
@@ -594,15 +421,33 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         </div>
 
         {classStudents.length > 0 && (
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between">
-            <span className="text-xs text-slate-600 dark:text-slate-300">
-              Pastikan status kehadiran telah akurat sebelum menekan Simpan.
-            </span>
+          <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Rekap jumlah hadir, sakit, ijin, alpa dalam 1 baris ke samping */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
+              <span className="font-semibold text-slate-600 dark:text-slate-300 mr-0.5">Jumlah:</span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-800 dark:text-emerald-300 text-xs">
+                <span>Hadir:</span>
+                <strong className="font-bold tabular-nums">{stats.hadir}</strong>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-100/80 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/70 text-blue-800 dark:text-blue-300 text-xs">
+                <span>Sakit:</span>
+                <strong className="font-bold tabular-nums">{stats.sakit}</strong>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/80 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/70 text-amber-800 dark:text-amber-300 text-xs">
+                <span>Izin:</span>
+                <strong className="font-bold tabular-nums">{stats.izin}</strong>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-100/80 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/70 text-rose-800 dark:text-rose-300 text-xs">
+                <span>Alpa:</span>
+                <strong className="font-bold tabular-nums">{stats.alpa}</strong>
+              </div>
+            </div>
+
             <button
               type="button"
               disabled={isSubmitting}
               onClick={handleSaveAttendance}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors justify-center self-end sm:self-auto"
             >
               <Save className="w-4 h-4" />
               {isSubmitting ? 'Menyimpan...' : 'Simpan Absensi'}

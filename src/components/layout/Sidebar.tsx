@@ -3,7 +3,7 @@ import {
   LayoutDashboard,
   Users,
   CalendarClock,
-  CheckSquare,
+  CalendarCheck,
   BookOpenCheck,
   GraduationCap,
   Award,
@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'murid', label: 'Data Murid', icon: Users },
     { id: 'jadwal', label: 'Jadwal Mengajar', icon: CalendarClock },
-    { id: 'absensi', label: 'Absensi Murid', icon: CheckSquare },
+    { id: 'absensi', label: 'Absensi Murid', icon: CalendarCheck },
     { id: 'jurnal', label: 'Jurnal Mengajar', icon: BookOpenCheck },
     { id: 'nilai_pengetahuan', label: 'Penilaian Pengetahuan', icon: GraduationCap },
     { id: 'nilai_keterampilan', label: 'Penilaian Keterampilan', icon: Award },
@@ -64,9 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleItemClick = (menu: NavigationMenu) => {
     onSelectMenu(menu);
-    if (isMobileOpen) {
-      onCloseMobile();
-    }
+    onCloseMobile();
   };
 
   return (
@@ -74,14 +72,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs lg:hidden transition-opacity"
+          className="fixed inset-0 z-40 bg-slate-900/60 lg:hidden transition-opacity"
           onClick={onCloseMobile}
         />
       )}
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-slate-900 text-slate-200 border-r border-slate-800 transition-all duration-300 ease-in-out no-print ${
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-slate-900 text-slate-200 border-r border-slate-800 transition-all duration-300 ease-in-out no-print ${
           isCollapsed ? 'w-20' : 'w-72'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >

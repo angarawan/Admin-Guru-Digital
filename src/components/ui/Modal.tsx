@@ -45,10 +45,17 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto no-print">
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={onClose} />
-      <div className="flex min-h-full items-center justify-center p-3 sm:p-4 text-center">
+      {/* Backdrop overlay strictly behind dialog */}
+      <div
+        className="fixed inset-0 bg-slate-900/60 transition-opacity"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Modal Dialog container explicitly above backdrop */}
+      <div className="relative z-10 flex min-h-full items-center justify-center p-3 sm:p-4 text-center pointer-events-none">
         <div
-          className={`w-full ${maxWidthClass} transform overflow-hidden rounded-xl bg-white dark:bg-slate-900 text-left align-middle shadow-2xl transition-all border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100`}
+          className={`w-full ${maxWidthClass} pointer-events-auto transform overflow-hidden rounded-xl bg-white dark:bg-slate-900 text-left align-middle shadow-2xl transition-all border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50/50 dark:bg-slate-800/40">

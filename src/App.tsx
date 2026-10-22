@@ -396,7 +396,6 @@ export default function App() {
               settings={settings}
               existingAttendance={attendance}
               onSaveAttendanceBatch={handleSaveAttendanceBatch}
-              onBatchDeleteAttendance={handleBatchDeleteAttendance}
             />
           )}
 
