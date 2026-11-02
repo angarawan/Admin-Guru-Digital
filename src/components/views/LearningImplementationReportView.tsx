@@ -50,6 +50,12 @@ export const LearningImplementationReportView: React.FC<LearningImplementationRe
   const [selectedSemester, setSelectedSemester] = useState<string>(settings.semester || 'Ganjil');
   const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
+  useEffect(() => {
+    if (selectedClassId !== 'all' && !classes.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId('all');
+    }
+  }, [classes, selectedClassId]);
+
   // Filter students based on class selection
   const filteredStudents = useMemo(() => {
     if (selectedClassId === 'all') return students;

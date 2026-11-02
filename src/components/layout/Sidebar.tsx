@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ChevronDown,
   School,
+  Building2,
   X,
 } from 'lucide-react';
 import { NavigationMenu, AppSettings } from '../../types';
@@ -64,6 +65,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Users,
       iconColor: 'text-emerald-400',
       items: [
+        {
+          id: 'kelas',
+          label: 'Data Kelas',
+          icon: Building2,
+          iconColor: 'text-indigo-400',
+        },
         {
           id: 'murid',
           label: 'Data Murid',

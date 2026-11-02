@@ -50,6 +50,13 @@ export const ReflectionCardView: React.FC<ReflectionCardViewProps> = ({
   const [editingCard, setEditingCard] = useState<ReflectionCard | null>(null);
   const [activeCard, setActiveCard] = useState<ReflectionCard | null>(null);
 
+  // Keep selectedClassFilter synchronized
+  useEffect(() => {
+    if (selectedClassFilter !== 'all' && !classes.some((c) => c.id === selectedClassFilter)) {
+      setSelectedClassFilter('all');
+    }
+  }, [classes, selectedClassFilter]);
+
   const todayStr = new Date().toISOString().split('T')[0];
 
   // Form State

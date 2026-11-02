@@ -101,7 +101,12 @@ function setStored<T>(key: string, value: T): void {
 // -------------------------------------------------------------
 export function getSettings(): AppSettings {
   const stored = getStored<AppSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...stored };
+  const merged = { ...DEFAULT_SETTINGS, ...stored };
+  if (merged.subject === 'Matematika') {
+    merged.subject = 'PJOK';
+    setStored(STORAGE_KEYS.SETTINGS, merged);
+  }
+  return merged;
 }
 
 export async function saveSettings(settings: AppSettings): Promise<{ success: boolean; message?: string }> {
@@ -142,18 +147,59 @@ export async function saveSettings(settings: AppSettings): Promise<{ success: bo
 // CLASSES
 // -------------------------------------------------------------
 export function getClasses(): ClassItem[] {
-  return getStored<ClassItem[]>(STORAGE_KEYS.CLASSES, DEFAULT_CLASSES);
+  let list = getStored<ClassItem[]>(STORAGE_KEYS.CLASSES, DEFAULT_CLASSES);
+  
+  // Smart migration: if stored classes still contain old Matematika MIPA demo names, migrate them to PJOK standards
+  let migrated = false;
+  const oldDemoNames: Record<string, string> = {
+    'X-A': 'X-1',
+    'X-B': 'X-2',
+    'XI-MIPA 1': 'XI-1',
+    'XI-MIPA 2': 'XI-2',
+    'XII-MIPA 1': 'XII-1',
+  };
+
+  list = list.map((c) => {
+    if (oldDemoNames[c.name]) {
+      migrated = true;
+      return { ...c, name: oldDemoNames[c.name] };
+    }
+    return c;
+  });
+
+  if (migrated) {
+    setStored(STORAGE_KEYS.CLASSES, list);
+  }
+
+  return list;
 }
 
 export async function saveClass(item: ClassItem): Promise<void> {
   const list = getClasses();
   const idx = list.findIndex((c) => c.id === item.id);
+  const oldItem = idx > -1 ? list[idx] : null;
+
   if (idx > -1) {
     list[idx] = item;
   } else {
     list.push(item);
   }
   setStored(STORAGE_KEYS.CLASSES, list);
+
+  // If class name changed, propagate update to journals className if necessary
+  if (oldItem && oldItem.name !== item.name) {
+    const journals = getJournals();
+    let jUpdated = false;
+    journals.forEach((j) => {
+      if (j.classIds && j.classIds.includes(item.id)) {
+        j.className = j.classIds.map((cid) => list.find((c) => c.id === cid)?.name || cid).join(', ');
+        jUpdated = true;
+      }
+    });
+    if (jUpdated) {
+      setStored(STORAGE_KEYS.JOURNALS, journals);
+    }
+  }
 
   const settings = getSettings();
   if (settings.appsScriptUrl) {
@@ -168,14 +214,115 @@ export async function saveClass(item: ClassItem): Promise<void> {
   }
 }
 
-export async function deleteClass(id: string): Promise<void> {
+export async function deleteClass(id: string, reassignToClassId?: string): Promise<void> {
   const list = getClasses().filter((c) => c.id !== id);
   setStored(STORAGE_KEYS.CLASSES, list);
+
+  const fallbackClassId = reassignToClassId || list[0]?.id;
+
+  // Reassign any students that were in the deleted class to avoid orphaned students
+  if (fallbackClassId) {
+    const students = getStudents();
+    let updated = false;
+    students.forEach((s) => {
+      if (s.classId === id) {
+        s.classId = fallbackClassId;
+        updated = true;
+      }
+    });
+    if (updated) {
+      setStored(STORAGE_KEYS.STUDENTS, students);
+    }
+  }
 
   const settings = getSettings();
   if (settings.appsScriptUrl) {
     await deleteRowRemote(settings.appsScriptUrl, 'Kelas', id);
   }
+}
+
+/**
+ * Reassigns all students from one class to another
+ */
+export async function reassignStudentsClass(fromClassId: string, toClassId: string): Promise<number> {
+  const students = getStudents();
+  let count = 0;
+  students.forEach((s) => {
+    if (s.classId === fromClassId) {
+      s.classId = toClassId;
+      count++;
+    }
+  });
+  if (count > 0) {
+    setStored(STORAGE_KEYS.STUDENTS, students);
+  }
+  return count;
+}
+
+/**
+ * Universally syncs all classes with students, schedules, journals, and attendance
+ * Ensures no orphan class IDs exist in any feature.
+ */
+export async function syncAllClassesWithData(): Promise<{ studentsSynced: number; journalsSynced: number }> {
+  const classes = getClasses();
+  if (classes.length === 0) return { studentsSynced: 0, journalsSynced: 0 };
+  const validClassIds = new Set(classes.map((c) => c.id));
+  const fallbackClassId = classes[0].id;
+
+  // 1. Sync Students
+  const students = getStudents();
+  let studentsSynced = 0;
+  students.forEach((s) => {
+    if (!validClassIds.has(s.classId)) {
+      s.classId = fallbackClassId;
+      studentsSynced++;
+    }
+  });
+  if (studentsSynced > 0) {
+    setStored(STORAGE_KEYS.STUDENTS, students);
+  }
+
+  // 2. Sync Journals
+  const journals = getJournals();
+  let journalsSynced = 0;
+  journals.forEach((j) => {
+    if (j.classIds && j.classIds.length > 0) {
+      const filtered = j.classIds.filter((cid) => validClassIds.has(cid));
+      if (filtered.length === 0) {
+        j.classIds = [fallbackClassId];
+        j.classId = fallbackClassId;
+        j.className = classes.find((c) => c.id === fallbackClassId)?.name || fallbackClassId;
+        journalsSynced++;
+      } else if (filtered.length !== j.classIds.length) {
+        j.classIds = filtered;
+        j.classId = filtered.join(', ');
+        j.className = filtered.map((cid) => classes.find((c) => c.id === cid)?.name || cid).join(', ');
+        journalsSynced++;
+      }
+    }
+  });
+  if (journalsSynced > 0) {
+    setStored(STORAGE_KEYS.JOURNALS, journals);
+  }
+
+  return { studentsSynced, journalsSynced };
+}
+
+/**
+ * Resets all classes and demo items to standard PJOK classes
+ */
+export async function resetClassesToPJOKDefaults(): Promise<void> {
+  setStored(STORAGE_KEYS.CLASSES, DEFAULT_CLASSES);
+  setStored(STORAGE_KEYS.STUDENTS, DEFAULT_STUDENTS);
+  setStored(STORAGE_KEYS.SCHEDULES, DEFAULT_SCHEDULE);
+  setStored(STORAGE_KEYS.ATTENDANCE, DEFAULT_ATTENDANCE);
+  setStored(STORAGE_KEYS.JOURNALS, DEFAULT_JOURNALS);
+  setStored(STORAGE_KEYS.KNOWLEDGE, DEFAULT_KNOWLEDGE_ASSESSMENTS);
+  setStored(STORAGE_KEYS.SKILLS, DEFAULT_SKILL_ASSESSMENTS);
+  setStored(STORAGE_KEYS.ATTITUDES, DEFAULT_ATTITUDE_ASSESSMENTS);
+  const settings = getSettings();
+  settings.subject = 'PJOK';
+  setStored(STORAGE_KEYS.SETTINGS, settings);
 }
 
 // -------------------------------------------------------------

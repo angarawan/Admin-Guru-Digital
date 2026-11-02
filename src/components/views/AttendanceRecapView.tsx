@@ -32,6 +32,13 @@ export const AttendanceRecapView: React.FC<AttendanceRecapViewProps> = ({
   const [academicYear, setAcademicYear] = useState<string>(settings.academicYear);
   const [semester, setSemester] = useState<string>(settings.semester);
 
+  // Keep selectedClassId synchronized when classes prop changes or if current id is not in classes
+  useEffect(() => {
+    if (classes.length > 0 && (!selectedClassId || !classes.some((c) => c.id === selectedClassId))) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, selectedClassId]);
+
   // Default date range: start of month to today
   const now = new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)

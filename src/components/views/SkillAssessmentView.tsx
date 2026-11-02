@@ -82,6 +82,19 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
   const [practiceType, setPracticeType] = useState<string>(practiceTypes[0]);
   const [assessmentDate, setAssessmentDate] = useState<string>(todayStr);
 
+  // Keep selectedClassId synchronized when classes prop changes or if current id is not in classes
+  useEffect(() => {
+    if (classes.length > 0 && (!selectedClassId || !classes.some((c) => c.id === selectedClassId))) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, selectedClassId]);
+
+  useEffect(() => {
+    if (settings.subject) {
+      setSubject(settings.subject);
+    }
+  }, [settings.subject]);
+
   // Selected student IDs for evaluation (multi-select)
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   // Dropdown open state for Langkah 2

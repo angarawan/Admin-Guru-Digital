@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Plus,
   Trash2,
+  Edit2,
   Clock,
   Building2,
   Layers,
@@ -44,6 +45,7 @@ interface SettingsViewProps {
   onSaveClass: (item: ClassItem) => Promise<void>;
   onDeleteClass: (id: string) => Promise<void>;
   onSavePeriods: (periods: PeriodTime[]) => Promise<void>;
+  onSyncAllClasses?: () => Promise<{ studentsSynced: number; journalsSynced: number }>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -54,6 +56,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onSaveClass,
   onDeleteClass,
   onSavePeriods,
+  onSyncAllClasses,
 }) => {
   const { isDarkMode, toggleDarkMode, setDarkMode } = useTheme();
 
@@ -69,6 +72,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [newClassName, setNewClassName] = useState('');
   const [newClassLevel, setNewClassLevel] = useState('X');
   const [newClassHomeroom, setNewClassHomeroom] = useState('');
+  const [editingClass, setEditingClass] = useState<ClassItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [syncClassStatus, setSyncClassStatus] = useState<string | null>(null);
 
   // Periods State
   const [localPeriods, setLocalPeriods] = useState<PeriodTime[]>([...periods]);
@@ -193,6 +199,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const handleDeleteClass = async (cls: ClassItem) => {
     if (confirm(`Hapus kelas ${cls.name}? Pastikan tidak ada murid aktif yang tertinggal.`)) {
       await onDeleteClass(cls.id);
+    }
+  };
+
+  const handleOpenEditClass = (cls: ClassItem) => {
+    setEditingClass(cls);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClass || !editingClass.name.trim()) return;
+
+    await onSaveClass(editingClass);
+    setIsEditModalOpen(false);
+    setEditingClass(null);
+    setSyncClassStatus(`Kelas "${editingClass.name}" berhasil diubah dan disinkronkan ke seluruh fitur!`);
+    setTimeout(() => setSyncClassStatus(null), 4000);
+  };
+
+  const handleSyncClasses = async () => {
+    if (onSyncAllClasses) {
+      const res = await onSyncAllClasses();
+      setSyncClassStatus(`Sinkronisasi selesai! Data kelas diselaraskan ke seluruh fitur.`);
+      setTimeout(() => setSyncClassStatus(null), 4000);
     }
   };
 
@@ -710,15 +740,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="space-y-6">
           {/* Class Management Section */}
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs p-6 space-y-4">
-            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-white">Manajemen Rombel / Kelas</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Tambah, edit, atau hapus kelas yang Anda ajar.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Tambah, edit nama, atau hapus kelas yang Anda ajar. Perubahan tersinkron ke seluruh fitur.
+                </p>
               </div>
-              <span className="text-xs font-mono font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-md">
-                {classes.length} Kelas Terdaftar
-              </span>
+              <div className="flex items-center gap-2">
+                {onSyncAllClasses && (
+                  <button
+                    type="button"
+                    onClick={handleSyncClasses}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 shadow-2xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    Sinkronkan ke Semua Fitur
+                  </button>
+                )}
+                <span className="text-xs font-mono font-bold px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-md">
+                  {classes.length} Kelas Terdaftar
+                </span>
+              </div>
             </div>
+
+            {syncClassStatus && (
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>{syncClassStatus}</span>
+              </div>
+            )}
 
             {/* Form Tambah Kelas */}
             <form onSubmit={handleAddClass} className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -729,7 +780,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   required
                   value={newClassName}
                   onChange={(e) => setNewClassName(e.target.value)}
-                  placeholder="Contoh: XII-MIPA 2"
+                  placeholder="Contoh: X-1, XI-1, XII-1"
                   className="w-full text-xs px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
               </div>
@@ -779,17 +830,96 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       Tingkat: {cls.level} {cls.homeroomTeacher ? `· Wali: ${cls.homeroomTeacher}` : ''}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteClass(cls)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                    title="Hapus Kelas"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditClass(cls)}
+                      className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                      title="Ubah Nama Kelas"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteClass(cls)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                      title="Hapus Kelas"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
+
+            {/* Edit Class Modal */}
+            <Modal
+              isOpen={isEditModalOpen}
+              onClose={() => setIsEditModalOpen(false)}
+              title={editingClass ? `Ubah Data Kelas: ${editingClass.name}` : 'Ubah Kelas'}
+              maxWidth="max-w-md"
+            >
+              {editingClass && (
+                <form onSubmit={handleSaveEditClass} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Nama Kelas *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editingClass.name}
+                      onChange={(e) => setEditingClass({ ...editingClass, name: e.target.value })}
+                      className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Tingkat *
+                    </label>
+                    <select
+                      value={editingClass.level}
+                      onChange={(e) => setEditingClass({ ...editingClass, level: e.target.value })}
+                      className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="X">Kelas X</option>
+                      <option value="XI">Kelas XI</option>
+                      <option value="XII">Kelas XII</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Wali Kelas
+                    </label>
+                    <input
+                      type="text"
+                      value={editingClass.homeroomTeacher || ''}
+                      onChange={(e) => setEditingClass({ ...editingClass, homeroomTeacher: e.target.value })}
+                      className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(false)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
+                    >
+                      Simpan Perubahan
+                    </button>
+                  </div>
+                </form>
+              )}
+            </Modal>
           </div>
 
           {/* Period Times 0 - 10 Setup (Mandatory Section 4 & 15) */}

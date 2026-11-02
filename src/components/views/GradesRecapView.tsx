@@ -44,6 +44,13 @@ export const GradesRecapView: React.FC<GradesRecapViewProps> = ({
   const [semester, setSemester] = useState<string>(settings.semester);
   const [selectedTopic, setSelectedTopic] = useState<string>('all');
 
+  // Keep selectedClassId synchronized when classes prop changes or if current id is not in classes
+  useEffect(() => {
+    if (classes.length > 0 && (!selectedClassId || !classes.some((c) => c.id === selectedClassId))) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, selectedClassId]);
+
   const activeClass = classes.find((c) => c.id === selectedClassId);
 
   // Filter students

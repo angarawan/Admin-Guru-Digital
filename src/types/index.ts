@@ -199,6 +199,7 @@ export interface ReflectionCard {
 
 export type NavigationMenu =
   | 'dashboard'
+  | 'kelas'
   | 'murid'
   | 'jadwal'
   | 'absensi'

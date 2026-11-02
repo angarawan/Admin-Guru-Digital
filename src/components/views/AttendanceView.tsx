@@ -39,8 +39,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
-  const [subject, setSubject] = useState<string>(settings.subject || 'Matematika');
+  const [subject, setSubject] = useState<string>(settings.subject || 'PJOK');
   const [selectedPeriod, setSelectedPeriod] = useState<number>(1);
+
+  // Keep selectedClassId synchronized when classes prop changes or if current id is not in classes
+  useEffect(() => {
+    if (classes.length > 0 && (!selectedClassId || !classes.some((c) => c.id === selectedClassId))) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, selectedClassId]);
+
+  useEffect(() => {
+    if (settings.subject) {
+      setSubject(settings.subject);
+    }
+  }, [settings.subject]);
 
   // Active attendance state for students in selected class
   const [studentStatuses, setStudentStatuses] = useState<

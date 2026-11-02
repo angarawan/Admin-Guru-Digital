@@ -41,12 +41,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [formData, setFormData] = useState<Partial<ScheduleItem>>({
     day: 'Senin',
     classId: classes[0]?.id || '',
-    subject: settings.subject || 'Matematika',
+    subject: settings.subject || 'PJOK',
     periodStart: 1,
     periodEnd: 2,
     startTime: '07:30',
     endTime: '09:00',
-    room: 'Ruang Kelas',
+    room: 'Lapangan Olahraga',
     notes: '',
   });
 
@@ -69,12 +69,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     setFormData({
       day: defaultDay || 'Senin',
       classId: classes[0]?.id || '',
-      subject: settings.subject || 'Matematika',
+      subject: settings.subject || 'PJOK',
       periodStart: 1,
       periodEnd: 2,
       startTime: pStart ? pStart.startTime : '07:30',
       endTime: pEnd ? pEnd.endTime : '09:00',
-      room: '',
+      room: 'Lapangan Olahraga',
       notes: '',
     });
     setIsModalOpen(true);

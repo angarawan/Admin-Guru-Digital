@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Award,
   Printer,
@@ -46,6 +46,12 @@ export const AssessmentReportView: React.FC<AssessmentReportViewProps> = ({
   const [selectedSemester, setSelectedSemester] = useState<string>(settings.semester || 'Ganjil');
   const [kktpScore, setKktpScore] = useState<number>(75);
   const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    if (selectedClassId !== 'all' && classes.length > 0 && !classes.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId(classes[0]?.id || 'all');
+    }
+  }, [classes, selectedClassId]);
 
   // Filter students
   const filteredStudents = useMemo(() => {

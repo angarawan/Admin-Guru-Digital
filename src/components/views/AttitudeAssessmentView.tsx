@@ -38,9 +38,22 @@ export const AttitudeAssessmentView: React.FC<AttitudeAssessmentViewProps> = ({
 
   // Parameters
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
-  const [subject, setSubject] = useState<string>(settings.subject || 'Matematika');
+  const [subject, setSubject] = useState<string>(settings.subject || 'PJOK');
   const [observationDate, setObservationDate] = useState<string>(todayStr);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+
+  // Keep selectedClassId synchronized when classes prop changes or if current id is not in classes
+  useEffect(() => {
+    if (classes.length > 0 && (!selectedClassId || !classes.some((c) => c.id === selectedClassId))) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, selectedClassId]);
+
+  useEffect(() => {
+    if (settings.subject) {
+      setSubject(settings.subject);
+    }
+  }, [settings.subject]);
 
   // Attitude criteria
   const defaultCriteria = [

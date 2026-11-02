@@ -12,6 +12,7 @@ import {
   XCircle,
   FileSpreadsheet,
   AlertCircle,
+  Building2,
 } from 'lucide-react';
 import { Student, ClassItem, AppSettings } from '../../types';
 import { Modal } from '../ui/Modal';
@@ -24,6 +25,7 @@ interface StudentsViewProps {
   onBatchSaveStudents: (students: Student[]) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
   onBatchDeleteStudents?: (ids: string[]) => Promise<void>;
+  onNavigateToClasses?: () => void;
 }
 
 export const StudentsView: React.FC<StudentsViewProps> = ({
@@ -34,9 +36,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   onBatchSaveStudents,
   onDeleteStudent,
   onBatchDeleteStudents,
+  onNavigateToClasses,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState<string>('all');
+
+  // Keep selectedClass valid if classes prop changes
+  React.useEffect(() => {
+    if (selectedClass !== 'all' && !classes.some((c) => c.id === selectedClass)) {
+      setSelectedClass('all');
+    }
+  }, [classes, selectedClass]);
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -270,6 +280,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onNavigateToClasses && (
+            <button
+              type="button"
+              onClick={onNavigateToClasses}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 shadow-2xs transition-colors"
+              title="Atur dan sinkronkan daftar rombel/kelas"
+            >
+              <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              Kelola Data Kelas
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}

@@ -60,6 +60,8 @@ import {
   saveReflection,
   deleteReflection,
   deleteReflectionsBatch,
+  syncAllClassesWithData,
+  resetClassesToPJOKDefaults,
   syncAllFromRemote,
   subscribeSyncStatus,
 } from './services/storage';
@@ -67,6 +69,7 @@ import {
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { DashboardView } from './components/views/DashboardView';
+import { ClassesView } from './components/views/ClassesView';
 import { StudentsView } from './components/views/StudentsView';
 import { ScheduleView } from './components/views/ScheduleView';
 import { AttendanceView } from './components/views/AttendanceView';
@@ -175,11 +178,25 @@ export default function App() {
   const handleSaveClass = async (item: ClassItem) => {
     await saveClass(item);
     setClasses(getClasses());
+    setJournals(getJournals());
   };
 
-  const handleDeleteClass = async (id: string) => {
-    await deleteClass(id);
+  const handleDeleteClass = async (id: string, reassignToClassId?: string) => {
+    await deleteClass(id, reassignToClassId);
     setClasses(getClasses());
+    setStudents(getStudents());
+    setJournals(getJournals());
+  };
+
+  const handleSyncAllClasses = async () => {
+    const res = await syncAllClassesWithData();
+    reloadAllLocalData();
+    return res;
+  };
+
+  const handleResetToPJOKDefaults = async () => {
+    await resetClassesToPJOKDefaults();
+    reloadAllLocalData();
   };
 
   const handleSavePeriods = async (newPeriods: PeriodTime[]) => {
@@ -367,6 +384,19 @@ export default function App() {
             />
           )}
 
+          {currentMenu === 'kelas' && (
+            <ClassesView
+              classes={classes}
+              students={students}
+              settings={settings}
+              onSaveClass={handleSaveClass}
+              onDeleteClass={handleDeleteClass}
+              onSyncAllClasses={handleSyncAllClasses}
+              onResetToPJOKDefaults={handleResetToPJOKDefaults}
+              onNavigate={(menu) => setCurrentMenu(menu)}
+            />
+          )}
+
           {currentMenu === 'murid' && (
             <StudentsView
               students={students}
@@ -376,6 +406,7 @@ export default function App() {
               onBatchSaveStudents={handleBatchSaveStudents}
               onDeleteStudent={handleDeleteStudent}
               onBatchDeleteStudents={handleBatchDeleteStudents}
+              onNavigateToClasses={() => setCurrentMenu('kelas')}
             />
           )}
 
@@ -539,6 +570,7 @@ export default function App() {
               onSaveClass={handleSaveClass}
               onDeleteClass={handleDeleteClass}
               onSavePeriods={handleSavePeriods}
+              onSyncAllClasses={handleSyncAllClasses}
             />
           )}
         </main>

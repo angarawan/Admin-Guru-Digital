@@ -178,6 +178,13 @@ export const JournalView: React.FC<JournalViewProps> = ({
   const [selectedFormClassIds, setSelectedFormClassIds] = useState<string[]>([]);
   const [selectedSportCategory, setSelectedSportCategory] = useState<string>('Sepak Bola / Futsal');
 
+  // Keep selectedClassFilter synchronized
+  useEffect(() => {
+    if (selectedClassFilter !== 'all' && !classes.some((c) => c.id === selectedClassFilter)) {
+      setSelectedClassFilter('all');
+    }
+  }, [classes, selectedClassFilter]);
+
   const [formData, setFormData] = useState<Partial<TeachingJournal>>({
     date: todayStr,
     day: dayNames[new Date().getDay()],
@@ -406,6 +413,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
   // Class names resolver for any journal
   const getJournalClassNames = (jr: TeachingJournal): string[] => {
+    if (jr.className && jr.className.trim()) {
+      return jr.className.split(',').map((s) => s.trim());
+    }
     if (jr.classIds && jr.classIds.length > 0) {
       return jr.classIds.map((id) => classes.find((c) => c.id === id)?.name || id);
     }
@@ -421,11 +431,14 @@ export const JournalView: React.FC<JournalViewProps> = ({
   const filteredJournals = journals.filter((j) => {
     let matchClass = true;
     if (selectedClassFilter !== 'all') {
-      if (j.classIds && j.classIds.length > 0) {
-        matchClass = j.classIds.includes(selectedClassFilter);
-      } else {
-        matchClass = j.classId.includes(selectedClassFilter);
-      }
+      const targetCls = classes.find((c) => c.id === selectedClassFilter);
+      const targetName = targetCls?.name.toLowerCase();
+
+      const inClassIds = j.classIds && j.classIds.includes(selectedClassFilter);
+      const inClassIdStr = j.classId && j.classId.includes(selectedClassFilter);
+      const inClassName = targetName && j.className && j.className.toLowerCase().includes(targetName);
+
+      matchClass = Boolean(inClassIds || inClassIdStr || inClassName);
     }
     const matchSearch =
       j.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||

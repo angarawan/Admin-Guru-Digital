@@ -131,7 +131,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Card 2: Jumlah Kelas */}
         <div
-          onClick={() => onNavigate('pengaturan')}
+          onClick={() => onNavigate('kelas')}
           className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xs transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">

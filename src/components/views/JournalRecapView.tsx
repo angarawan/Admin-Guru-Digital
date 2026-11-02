@@ -28,6 +28,12 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
   const [academicYear, setAcademicYear] = useState<string>(settings.academicYear);
   const [semester, setSemester] = useState<string>(settings.semester);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  useEffect(() => {
+    if (selectedClassId !== 'all' && !classes.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId('all');
+    }
+  }, [classes, selectedClassId]);
   const getJournalClassNames = (jr: TeachingJournal) => {
     if (jr.className) return jr.className;
     if (jr.classIds && jr.classIds.length > 0) {
