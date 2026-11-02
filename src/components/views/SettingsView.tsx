@@ -19,6 +19,11 @@ import {
   Sun,
   Moon,
   Smartphone,
+  Upload,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Sparkles,
+  FileImage,
 } from 'lucide-react';
 import {
   AppSettings,
@@ -76,6 +81,76 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   });
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Logo Input Mode (Upload File vs Isi URL)
+  const [logoInputMode, setLogoInputMode] = useState<'upload' | 'url'>('upload');
+
+  // Tut Wuri Handayani Official Vector Preset
+  const TUT_WURI_HANDAYANI_SVG =
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="100" cy="100" r="95" fill="%230b5cad"/><circle cx="100" cy="100" r="86" fill="none" stroke="%23f9d616" stroke-width="5"/><polygon points="100,20 120,70 175,70 130,105 148,160 100,128 52,160 70,105 25,70 80,70" fill="%23f9d616"/><circle cx="100" cy="100" r="28" fill="%23ffffff"/><polygon points="100,78 106,94 122,94 109,104 114,120 100,111 86,120 91,104 78,94 94,94" fill="%23d9222a"/><path d="M70,145 Q100,165 130,145" stroke="%23ffffff" stroke-width="6" fill="none" stroke-linecap="round"/><text x="100" y="180" font-family="sans-serif" font-size="11" font-weight="bold" fill="%23ffffff" text-anchor="middle">TUT WURI HANDAYANI</text></svg>';
+
+  // Handle Logo Upload from Local Device (File / Foto)
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih file gambar yang valid (PNG, JPG, JPEG, SVG, WebP).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (!result) return;
+
+      // If image is large (> 400KB) and not SVG, resize via canvas to ensure localStorage stays fast
+      if (file.size > 400 * 1024 && !file.type.includes('svg')) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_DIM = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/png', 0.9);
+            setFormData((prev) => ({ ...prev, schoolLogo: compressed }));
+          } else {
+            setFormData((prev) => ({ ...prev, schoolLogo: result }));
+          }
+        };
+        img.src = result;
+      } else {
+        setFormData((prev) => ({ ...prev, schoolLogo: result }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearLogo = () => {
+    setFormData((prev) => ({ ...prev, schoolLogo: '' }));
+  };
+
+  const handleSetTutWuriPreset = () => {
+    setFormData((prev) => ({ ...prev, schoolLogo: TUT_WURI_HANDAYANI_SVG }));
+  };
 
   // Save General Settings
   const handleSaveGeneral = async (e: React.FormEvent) => {
@@ -335,108 +410,286 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white">Profil Guru & Satuan Pendidikan</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Informasi ini akan tertera pada seluruh cetakan dokumen dan kop surat.</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Nama Lengkap Guru (dengan Gelar) *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.teacherName}
-                onChange={(e) => setFormData({ ...formData, teacherName: e.target.value })}
-                className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
-              />
+          {/* Section: Profil Guru */}
+          <div className="space-y-4">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                Profil Guru Mata Pelajaran
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Identitas guru yang akan tercantum pada tanda tangan dan lembar administrasi.</p>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                NIP (Nomor Induk Pegawai - Opsional)
-              </label>
-              <input
-                type="text"
-                value={formData.teacherNip}
-                onChange={(e) => setFormData({ ...formData, teacherNip: e.target.value })}
-                placeholder="Contoh: 19780512 200501 2 004"
-                className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
-              />
-            </div>
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Lengkap Guru (dengan Gelar) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.teacherName}
+                  onChange={(e) => setFormData({ ...formData, teacherName: e.target.value })}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
+                />
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Nama Sekolah / Instansi *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.schoolName}
-                onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
-                className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Mata Pelajaran yang Diampu *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.subject}
-                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
-              />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  NIP Guru (Nomor Induk Pegawai - Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.teacherNip}
+                  onChange={(e) => setFormData({ ...formData, teacherNip: e.target.value })}
+                  placeholder="Contoh: 19780512 200501 2 004"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Tahun Ajaran Aktif *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.academicYear}
-                onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
-                placeholder="2024/2025"
-                className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
-              />
+          {/* Section: Kepala Sekolah (Diisi Manual) */}
+          <div className="space-y-4 pt-2">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                Kepala Sekolah / Pimpinan Satuan Pendidikan
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Nama dan NIP Kepala Sekolah akan tercantum secara otomatis pada kolom pengesahan & tanda tangan &quot;Mengetahui&quot; di seluruh dokumen cetak / PDF.
+              </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Semester Aktif *
-              </label>
-              <select
-                value={formData.semester}
-                onChange={(e) => setFormData({ ...formData, semester: e.target.value as any })}
-                className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
-              >
-                <option value="Ganjil">Semester Ganjil</option>
-                <option value="Genap">Semester Genap</option>
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Kepala Sekolah (dengan Gelar) *
+                </label>
+                <input
+                  type="text"
+                  value={formData.principalName || ''}
+                  onChange={(e) => setFormData({ ...formData, principalName: e.target.value })}
+                  placeholder="Contoh: Dr. H. Ahmad Dahlan, M.Pd"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  NIP Kepala Sekolah (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.principalNip || ''}
+                  onChange={(e) => setFormData({ ...formData, principalNip: e.target.value })}
+                  placeholder="Contoh: 19680315 199303 1 002"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              URL Logo Sekolah (Opsional untuk Kop Surat)
-            </label>
-            <input
-              type="url"
-              value={formData.schoolLogo || ''}
-              onChange={(e) => setFormData({ ...formData, schoolLogo: e.target.value })}
-              placeholder="https://..."
-              className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+          {/* Section: Identitas Satuan Pendidikan & Periode */}
+          <div className="space-y-4 pt-2">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-2">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white">Satuan Pendidikan & Periode Akademik</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Informasi nama sekolah dan semester aktif pada kop surat.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Sekolah / Instansi *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.schoolName}
+                  onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Mata Pelajaran yang Diampu *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Tahun Ajaran Aktif *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.academicYear}
+                  onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
+                  placeholder="2024/2025"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Semester Aktif *
+                </label>
+                <select
+                  value={formData.semester}
+                  onChange={(e) => setFormData({ ...formData, semester: e.target.value as any })}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  <option value="Ganjil">Semester Ganjil</option>
+                  <option value="Genap">Semester Genap</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Logo Sekolah (Upload Manual / Isi Manual) */}
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Logo Resmi Sekolah (Kop Surat & Laporan Cetak)
+                </label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Bisa di-upload manual dari perangkat (file gambar) atau diisi manual berupa tautan / URL gambar web.
+                </p>
+              </div>
+
+              {/* Mode Selector Tab: Upload vs URL */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 self-start sm:self-auto text-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setLogoInputMode('upload')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition-all ${
+                    logoInputMode === 'upload'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload File
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLogoInputMode('url')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition-all ${
+                    logoInputMode === 'url'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  Isi URL Web
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-1">
+              {/* Input Area (2 cols) */}
+              <div className="md:col-span-2 space-y-2.5">
+                {logoInputMode === 'upload' ? (
+                  <div>
+                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 rounded-xl p-4 bg-white dark:bg-slate-900 cursor-pointer transition-colors group">
+                      <div className="p-2.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-2">
+                        Pilih Gambar Logo dari Perangkat (HP / Laptop)
+                      </span>
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        Mendukung format PNG, JPG, JPEG, SVG, WebP (Maks. 2MB)
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                        onChange={handleLogoFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Ketik / Tempel URL Gambar Logo
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={formData.schoolLogo || ''}
+                        onChange={(e) => setFormData({ ...formData, schoolLogo: e.target.value })}
+                        placeholder="https://example.com/logo-sekolah.png"
+                        className="w-full text-xs pl-8 pr-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                      />
+                      <LinkIcon className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Preset & Action Options */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Pilihan Cepat:</span>
+                  <button
+                    type="button"
+                    onClick={handleSetTutWuriPreset}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-blue-400 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition-colors shadow-2xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    Gunakan Logo Tut Wuri Handayani
+                  </button>
+                  {formData.schoolLogo && (
+                    <button
+                      type="button"
+                      onClick={handleClearLogo}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 text-[11px] font-medium text-rose-700 dark:text-rose-300 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Hapus Logo
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Preview Box (1 col) */}
+              <div className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-center min-h-[120px]">
+                {formData.schoolLogo ? (
+                  <div className="space-y-2">
+                    <div className="w-20 h-20 mx-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-1 flex items-center justify-center overflow-hidden shadow-2xs">
+                      <img
+                        src={formData.schoolLogo}
+                        alt="Pratinjau Logo Sekolah"
+                        className="max-w-full max-h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      Logo Terpasang
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-1 text-slate-400 dark:text-slate-500 py-2">
+                    <FileImage className="w-8 h-8 mx-auto stroke-1" />
+                    <p className="text-[11px]">Belum ada logo</p>
+                    <p className="text-[10px] text-slate-400">Pratinjau akan muncul di sini</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">

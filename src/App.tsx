@@ -79,6 +79,8 @@ import { ReflectionCardView } from './components/views/ReflectionCardView';
 import { AttendanceRecapView } from './components/views/AttendanceRecapView';
 import { JournalRecapView } from './components/views/JournalRecapView';
 import { GradesRecapView } from './components/views/GradesRecapView';
+import { LearningImplementationReportView } from './components/views/LearningImplementationReportView';
+import { AssessmentReportView } from './components/views/AssessmentReportView';
 import { SettingsView } from './components/views/SettingsView';
 
 export default function App() {
@@ -330,6 +332,7 @@ export default function App() {
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        settings={settings}
       />
 
       {/* Main Content Area */}
@@ -429,6 +432,7 @@ export default function App() {
               classes={classes}
               settings={settings}
               existingAssessments={skillAssessments}
+              attendance={attendance}
               onSaveAssessmentBatch={handleSaveSkillBatch}
               onDeleteAssessment={handleDeleteSkill}
               onBatchDeleteAssessments={handleBatchDeleteSkills}
@@ -494,6 +498,29 @@ export default function App() {
 
           {currentMenu === 'rekap_nilai' && (
             <GradesRecapView
+              students={students}
+              classes={classes}
+              knowledgeAssessments={knowledgeAssessments}
+              skillAssessments={skillAssessments}
+              attitudeAssessments={attitudeAssessments}
+              settings={settings}
+            />
+          )}
+
+          {currentMenu === 'laporan_pelaksanaan' && (
+            <LearningImplementationReportView
+              journals={journals}
+              attendance={attendance}
+              mentoringJournals={mentoringJournals}
+              reflections={reflections}
+              classes={classes}
+              students={students}
+              settings={settings}
+            />
+          )}
+
+          {currentMenu === 'laporan_penilaian' && (
+            <AssessmentReportView
               students={students}
               classes={classes}
               knowledgeAssessments={knowledgeAssessments}

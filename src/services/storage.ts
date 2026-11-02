@@ -100,7 +100,8 @@ function setStored<T>(key: string, value: T): void {
 // SETTINGS
 // -------------------------------------------------------------
 export function getSettings(): AppSettings {
-  return getStored<AppSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+  const stored = getStored<AppSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+  return { ...DEFAULT_SETTINGS, ...stored };
 }
 
 export async function saveSettings(settings: AppSettings): Promise<{ success: boolean; message?: string }> {

@@ -16,6 +16,8 @@ import {
 export const DEFAULT_SETTINGS: AppSettings = {
   teacherName: 'Dra. Hj. Siti Rahmawati, M.Pd',
   teacherNip: '19780512 200501 2 004',
+  principalName: 'Dr. H. Ahmad Dahlan, M.Pd',
+  principalNip: '19680315 199303 1 002',
   schoolName: 'SMA Negeri 1 Makassar',
   subject: 'Matematika',
   academicYear: '2024/2025',

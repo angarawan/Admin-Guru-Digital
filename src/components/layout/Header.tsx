@@ -75,6 +75,14 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
+        {settings.schoolLogo && (
+          <img
+            src={settings.schoolLogo}
+            alt="Logo Sekolah"
+            className="w-8 h-8 rounded object-contain shrink-0 bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 hidden sm:block"
+          />
+        )}
+
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight">

@@ -883,19 +883,28 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
             {/* Official Printable Document Format */}
             <div className="printable-area border border-slate-300 p-8 rounded-lg bg-white space-y-5 text-slate-900 font-serif">
               {/* Kop Surat Sekolah */}
-              <div className="text-center border-b-2 border-slate-900 pb-4">
-                <h3 className="text-sm font-bold tracking-wider uppercase text-slate-900 font-sans">
-                  {settings.schoolName || 'SMA NEGERI CONTOH'}
-                </h3>
-                <h2 className="text-base font-extrabold uppercase font-sans mt-0.5">
-                  LEMBAR JURNAL PENDAMPINGAN SISWA
-                </h2>
-                <p className="text-xs font-sans text-slate-600">
-                  Tahun Ajaran {settings.academicYear} · Semester {settings.semester}
-                </p>
-                <p className="text-[11px] font-sans font-mono text-slate-500 mt-1">
-                  Nomor Arsip: {activeJournal.journalNumber}
-                </p>
+              <div className="flex items-center justify-center gap-4 border-b-2 border-slate-900 pb-4">
+                {settings.schoolLogo && (
+                  <img
+                    src={settings.schoolLogo}
+                    alt="Logo Sekolah"
+                    className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0"
+                  />
+                )}
+                <div className="text-center flex-1">
+                  <h3 className="text-sm font-bold tracking-wider uppercase text-slate-900 font-sans">
+                    {settings.schoolName || 'SMA NEGERI CONTOH'}
+                  </h3>
+                  <h2 className="text-base font-extrabold uppercase font-sans mt-0.5">
+                    LEMBAR JURNAL PENDAMPINGAN SISWA
+                  </h2>
+                  <p className="text-xs font-sans text-slate-600">
+                    Tahun Ajaran {settings.academicYear} · Semester {settings.semester}
+                  </p>
+                  <p className="text-[11px] font-sans font-mono text-slate-500 mt-1">
+                    Nomor Arsip: {activeJournal.journalNumber}
+                  </p>
+                </div>
               </div>
 
               {/* Data Siswa */}

@@ -28,10 +28,21 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
   const [academicYear, setAcademicYear] = useState<string>(settings.academicYear);
   const [semester, setSemester] = useState<string>(settings.semester);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const getJournalClassNames = (jr: TeachingJournal) => {
+    if (jr.className) return jr.className;
+    if (jr.classIds && jr.classIds.length > 0) {
+      return jr.classIds.map((id) => classes.find((c) => c.id === id)?.name || id).join(', ');
+    }
+    return classes.find((c) => c.id === jr.classId)?.name || jr.classId;
+  };
 
   const filteredJournals = useMemo(() => {
     return journals.filter((j) => {
-      const matchClass = selectedClassId === 'all' || j.classId === selectedClassId;
+      const matchClass =
+        selectedClassId === 'all' ||
+        j.classId === selectedClassId ||
+        j.classIds?.includes(selectedClassId) ||
+        j.classId.includes(selectedClassId);
       const matchYear = !academicYear || j.academicYear === academicYear;
       const matchSem = !semester || j.semester === semester;
 
@@ -54,7 +65,7 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
       'Hari/Tanggal',
       'Kelas',
       'Jam Pelajaran',
-      'Materi / Pokok Bahasan',
+      'Materi Pembelajaran',
       'Kegiatan Pembelajaran',
       'Metode',
       'Hasil & Capaian',
@@ -62,11 +73,11 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
     ];
 
     const rows = filteredJournals.map((jr, idx) => {
-      const cls = classes.find((c) => c.id === jr.classId);
+      const clsName = getJournalClassNames(jr);
       return [
         idx + 1,
         `"${jr.day}, ${jr.date}"`,
-        `"${cls?.name || jr.classId}"`,
+        `"${clsName}"`,
         `"Jam ${jr.periodStart}-${jr.periodEnd}"`,
         `"${jr.topic.replace(/"/g, '""')}"`,
         `"${jr.activities.replace(/"/g, '""')}"`,
@@ -205,29 +216,38 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
       {/* Printable Area Wrapper */}
       <div className="printable-area bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 shadow-2xs p-6 space-y-4">
         {/* Printable Official Header */}
-        <div className="text-center border-b-2 border-slate-800 dark:border-slate-700 pb-3">
-          <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-800 dark:text-slate-200">
-            {settings.schoolName || 'KEMENTERIAN PENDIDIKAN, KEBUDAYAAN, RISET, DAN TEKNOLOGI'}
-          </h3>
-          <h2 className="text-base sm:text-lg font-extrabold uppercase text-slate-950 dark:text-white mt-0.5">
-            BUKU JURNAL AGENDA GURU MENGAJAR
-          </h2>
-          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap justify-center gap-3">
-            <span>
-              Guru Pengajar: <strong className="text-slate-900 dark:text-white">{settings.teacherName}</strong>
-            </span>
-            <span>·</span>
-            <span>
-              Mata Pelajaran: <strong className="text-slate-900 dark:text-white">{settings.subject}</strong>
-            </span>
-            <span>·</span>
-            <span>
-              Kelas: <strong className="text-slate-900 dark:text-white">{activeClass ? activeClass.name : 'Semua Kelas'}</strong>
-            </span>
-            <span>·</span>
-            <span>
-              Tahun Ajaran: <strong className="text-slate-900 dark:text-white">{academicYear}</strong> ({semester})
-            </span>
+        <div className="flex items-center justify-center gap-4 border-b-2 border-slate-800 dark:border-slate-700 pb-3">
+          {settings.schoolLogo && (
+            <img
+              src={settings.schoolLogo}
+              alt="Logo Sekolah"
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0"
+            />
+          )}
+          <div className="text-center flex-1">
+            <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-800 dark:text-slate-200">
+              {settings.schoolName || 'KEMENTERIAN PENDIDIKAN, KEBUDAYAAN, RISET, DAN TEKNOLOGI'}
+            </h3>
+            <h2 className="text-base sm:text-lg font-extrabold uppercase text-slate-950 dark:text-white mt-0.5">
+              BUKU JURNAL AGENDA GURU MENGAJAR
+            </h2>
+            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap justify-center gap-3">
+              <span>
+                Guru Pengajar: <strong className="text-slate-900 dark:text-white">{settings.teacherName}</strong>
+              </span>
+              <span>·</span>
+              <span>
+                Mata Pelajaran: <strong className="text-slate-900 dark:text-white">{settings.subject}</strong>
+              </span>
+              <span>·</span>
+              <span>
+                Kelas: <strong className="text-slate-900 dark:text-white">{activeClass ? activeClass.name : 'Semua Kelas'}</strong>
+              </span>
+              <span>·</span>
+              <span>
+                Tahun Ajaran: <strong className="text-slate-900 dark:text-white">{academicYear}</strong> ({semester})
+              </span>
+            </div>
           </div>
         </div>
 
@@ -251,9 +271,9 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
               <tr>
                 <th className="py-2.5 px-3 text-center w-12 border-r border-slate-200 dark:border-slate-700">Ke-</th>
                 <th className="py-2.5 px-3 w-32 border-r border-slate-200 dark:border-slate-700">Hari / Tanggal</th>
-                <th className="py-2.5 px-3 w-20 border-r border-slate-200 dark:border-slate-700">Kelas</th>
+                <th className="py-2.5 px-3 w-28 border-r border-slate-200 dark:border-slate-700">Kelas</th>
                 <th className="py-2.5 px-3 w-24 border-r border-slate-200 dark:border-slate-700">Jam Ke-</th>
-                <th className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-700">Materi & Tujuan Pembelajaran</th>
+                <th className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-700">Materi Pembelajaran</th>
                 <th className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-700">Metode & Kegiatan</th>
                 <th className="py-2.5 px-3 w-48">Hasil / Catatan Guru</th>
               </tr>
@@ -261,7 +281,6 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {filteredJournals.length > 0 ? (
                 filteredJournals.map((jr, idx) => {
-                  const cls = classes.find((c) => c.id === jr.classId);
                   return (
                     <tr key={jr.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
                       <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600 dark:text-slate-400 tabular-nums border-r border-slate-200 dark:border-slate-700">
@@ -272,18 +291,13 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
                         <div className="text-[11px] text-slate-500 dark:text-slate-400">{jr.date}</div>
                       </td>
                       <td className="py-2.5 px-3 font-bold text-blue-900 dark:text-blue-300 border-r border-slate-200 dark:border-slate-700">
-                        {cls?.name || jr.classId}
+                        {getJournalClassNames(jr)}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400 border-r border-slate-200 dark:border-slate-700 tabular-nums">
                         Jam {jr.periodStart}-{jr.periodEnd}
                       </td>
                       <td className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-700">
-                        <div className="font-bold text-slate-900 dark:text-white">{jr.topic}</div>
-                        {jr.learningObjective && (
-                          <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-2">
-                            {jr.learningObjective}
-                          </div>
-                        )}
+                        <div className="font-bold text-slate-900 dark:text-white whitespace-pre-line">{jr.topic}</div>
                       </td>
                       <td className="py-2.5 px-3 border-r border-slate-200 dark:border-slate-700">
                         <div className="font-semibold text-slate-800 dark:text-slate-200">{jr.method}</div>
@@ -319,8 +333,12 @@ export const JournalRecapView: React.FC<JournalRecapViewProps> = ({
             <p className="text-slate-500 dark:text-slate-400">Mengetahui,</p>
             <p className="font-semibold text-slate-800 dark:text-slate-200">Kepala Sekolah</p>
             <div className="h-16" />
-            <p className="font-bold underline uppercase text-slate-900 dark:text-white">Dr. H. Ahmad Dahlan, M.Pd</p>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">NIP. 19680315 199303 1 002</p>
+            <p className="font-bold underline uppercase text-slate-900 dark:text-white">
+              {settings.principalName || 'Dr. H. Ahmad Dahlan, M.Pd'}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+              {settings.principalNip ? `NIP. ${settings.principalNip}` : 'NIP. .....................'}
+            </p>
           </div>
 
           <div className="text-right">

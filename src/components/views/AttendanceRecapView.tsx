@@ -260,28 +260,37 @@ export const AttendanceRecapView: React.FC<AttendanceRecapViewProps> = ({
       {/* Printable Area Wrapper */}
       <div className="printable-area bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 shadow-2xs p-6 space-y-4">
         {/* Printable Official Header */}
-        <div className="text-center border-b-2 border-slate-800 dark:border-slate-700 pb-3">
-          <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-800 dark:text-slate-200">
-            {settings.schoolName || 'KEMENTERIAN PENDIDIKAN, KEBUDAYAAN, RISET, DAN TEKNOLOGI'}
-          </h3>
-          <h2 className="text-base sm:text-lg font-extrabold uppercase text-slate-950 dark:text-white mt-0.5">
-            REKAPITULASI KEHADIRAN MURID
-          </h2>
-          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap justify-center gap-3">
-            <span>
-              Kelas: <strong className="text-slate-900 dark:text-white">{activeClass?.name}</strong>
-            </span>
-            <span>·</span>
-            <span>
-              Periode:{' '}
-              <strong className="text-slate-900 dark:text-white font-mono">
-                {startDate || 'Awal'} s.d {endDate || 'Sekarang'}
-              </strong>
-            </span>
-            <span>·</span>
-            <span>
-              Tahun Ajaran: <strong className="text-slate-900 dark:text-white">{academicYear}</strong> ({semester})
-            </span>
+        <div className="flex items-center justify-center gap-4 border-b-2 border-slate-800 dark:border-slate-700 pb-3">
+          {settings.schoolLogo && (
+            <img
+              src={settings.schoolLogo}
+              alt="Logo Sekolah"
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0"
+            />
+          )}
+          <div className="text-center flex-1">
+            <h3 className="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-800 dark:text-slate-200">
+              {settings.schoolName || 'KEMENTERIAN PENDIDIKAN, KEBUDAYAAN, RISET, DAN TEKNOLOGI'}
+            </h3>
+            <h2 className="text-base sm:text-lg font-extrabold uppercase text-slate-950 dark:text-white mt-0.5">
+              REKAPITULASI KEHADIRAN MURID
+            </h2>
+            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap justify-center gap-3">
+              <span>
+                Kelas: <strong className="text-slate-900 dark:text-white">{activeClass?.name}</strong>
+              </span>
+              <span>·</span>
+              <span>
+                Periode:{' '}
+                <strong className="text-slate-900 dark:text-white font-mono">
+                  {startDate || 'Awal'} s.d {endDate || 'Sekarang'}
+                </strong>
+              </span>
+              <span>·</span>
+              <span>
+                Tahun Ajaran: <strong className="text-slate-900 dark:text-white">{academicYear}</strong> ({semester})
+              </span>
+            </div>
           </div>
         </div>
 
@@ -396,8 +405,12 @@ export const AttendanceRecapView: React.FC<AttendanceRecapViewProps> = ({
             <p className="text-slate-500 dark:text-slate-400">Mengetahui,</p>
             <p className="font-semibold text-slate-800 dark:text-slate-200">Kepala Sekolah</p>
             <div className="h-16" />
-            <p className="font-bold underline uppercase text-slate-900 dark:text-white">Dr. H. Ahmad Dahlan, M.Pd</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">NIP. 19680315 199303 1 002</p>
+            <p className="font-bold underline uppercase text-slate-900 dark:text-white">
+              {settings.principalName || 'Dr. H. Ahmad Dahlan, M.Pd'}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+              {settings.principalNip ? `NIP. ${settings.principalNip}` : 'NIP. .....................'}
+            </p>
           </div>
 
           <div className="text-right">

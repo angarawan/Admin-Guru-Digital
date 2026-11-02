@@ -1,6 +1,8 @@
 export interface AppSettings {
   teacherName: string;
   teacherNip: string;
+  principalName?: string;
+  principalNip?: string;
   schoolName: string;
   subject: string;
   academicYear: string;
@@ -74,12 +76,14 @@ export interface TeachingJournal {
   id: string;
   date: string;
   day: string;
-  classId: string;
+  classId: string; // single ID or comma-separated string for backward compatibility
+  classIds?: string[]; // multiple selected class IDs
+  className?: string; // friendly combined names (e.g. "X-A, X-B")
   subject: string;
   periodStart: number;
   periodEnd: number;
   topic: string;
-  learningObjective: string;
+  learningObjective?: string; // made optional per user request to omit
   activities: string;
   method: string;
   results: string;
@@ -207,4 +211,6 @@ export type NavigationMenu =
   | 'rekap_absensi'
   | 'rekap_jurnal'
   | 'rekap_nilai'
+  | 'laporan_pelaksanaan'
+  | 'laporan_penilaian'
   | 'pengaturan';
