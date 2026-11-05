@@ -409,7 +409,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingClass ? `Ubah Data Kelas: ${editingClass.name}` : 'Tambah Kelas Baru'}
-        maxWidth="max-w-md"
+        maxWidth="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

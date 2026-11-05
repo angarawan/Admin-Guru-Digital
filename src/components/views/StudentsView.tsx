@@ -72,17 +72,21 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const [importPreview, setImportPreview] = useState<Student[]>([]);
   const [importError, setImportError] = useState('');
 
-  // Filtered Students
+  // Filtered Students with robust class ID or class name matching
   const filteredStudents = useMemo(() => {
+    const targetClass = classes.find((c) => c.id === selectedClass);
     return students.filter((s) => {
       const matchSearch =
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.nis.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.nisn.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchClass = selectedClass === 'all' || s.classId === selectedClass;
+      const matchClass =
+        selectedClass === 'all' ||
+        s.classId === selectedClass ||
+        (targetClass && s.classId.toLowerCase() === targetClass.name.toLowerCase());
       return matchSearch && matchClass;
     });
-  }, [students, searchTerm, selectedClass]);
+  }, [students, searchTerm, selectedClass, classes]);
 
   const totalPages = Math.ceil(filteredStudents.length / pageSize) || 1;
   const paginatedStudents = filteredStudents.slice((page - 1) * pageSize, page * pageSize);
@@ -333,7 +337,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
           >
             <option value="all">Semua Kelas ({students.length})</option>
             {classes.map((cls) => {
-              const count = students.filter((s) => s.classId === cls.id).length;
+              const count = students.filter(
+                (s) => s.classId === cls.id || s.classId.toLowerCase() === cls.name.toLowerCase()
+              ).length;
               return (
                 <option key={cls.id} value={cls.id}>
                   {cls.name} ({count} murid)
@@ -430,7 +436,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {paginatedStudents.length > 0 ? (
                 paginatedStudents.map((student, idx) => {
-                  const studentClass = classes.find((c) => c.id === student.classId);
+                  const studentClass = classes.find(
+                    (c) => c.id === student.classId || c.name.toLowerCase() === student.classId.toLowerCase()
+                  );
                   const isSelected = selectedIds.includes(student.id);
                   return (
                     <tr

@@ -105,12 +105,17 @@ export const KnowledgeAssessmentView: React.FC<KnowledgeAssessmentViewProps> = (
     return classes.find((c) => c.id === selectedClassId);
   }, [classes, selectedClassId]);
 
-  // Active students for selected class
+  // Active students for selected class with name fallback
   const classStudents = useMemo(() => {
     return students
-      .filter((s) => s.classId === selectedClassId && s.isActive)
+      .filter((s) => {
+        if (!s.isActive) return false;
+        if (s.classId === selectedClassId) return true;
+        if (currentClass && s.classId.toLowerCase() === currentClass.name.toLowerCase()) return true;
+        return false;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [students, selectedClassId]);
+  }, [students, selectedClassId, currentClass]);
 
   // Load existing saved scores when class, topic, or assessmentType changes
   useEffect(() => {

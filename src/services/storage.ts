@@ -241,6 +241,75 @@ export async function deleteClass(id: string, reassignToClassId?: string): Promi
   }
 }
 
+// -------------------------------------------------------------
+// STUDENTS (DATA MURID)
+// -------------------------------------------------------------
+export function getStudents(): Student[] {
+  const classes = getClasses();
+  let list = getStored<Student[]>(STORAGE_KEYS.STUDENTS, DEFAULT_STUDENTS);
+  if (!Array.isArray(list) || list.length === 0) {
+    list = DEFAULT_STUDENTS;
+  }
+
+  // Auto-heal class references:
+  // If student.classId is an old demo name like 'XI-MIPA 1' or 'X-A', or class name like 'X-1', map to actual class ID
+  const classByName = new Map<string, string>();
+  classes.forEach((c) => {
+    classByName.set(c.name.toLowerCase(), c.id);
+    classByName.set(c.id.toLowerCase(), c.id);
+  });
+
+  const legacyDemoClassMap: Record<string, string> = {
+    'x-a': 'cls-1',
+    'x-b': 'cls-2',
+    'xi-mipa 1': 'cls-3',
+    'xi-mipa 2': 'cls-4',
+    'xii-mipa 1': 'cls-5',
+    'x-1': 'cls-1',
+    'x-2': 'cls-2',
+    'xi-1': 'cls-3',
+    'xi-2': 'cls-4',
+    'xii-1': 'cls-5',
+  };
+
+  const validClassIds = new Set(classes.map((c) => c.id));
+  const defaultClassId = classes[0]?.id || 'cls-1';
+
+  let changed = false;
+  list = list.map((s) => {
+    const rawClass = (s.classId || '').trim().toLowerCase();
+    // 1. If valid class ID already, keep it
+    if (validClassIds.has(s.classId)) {
+      return s;
+    }
+    // 2. If matches a class name (e.g. 'X-1', 'XI-1')
+    if (classByName.has(rawClass)) {
+      changed = true;
+      return { ...s, classId: classByName.get(rawClass)! };
+    }
+    // 3. If matches legacy demo class name
+    if (legacyDemoClassMap[rawClass]) {
+      const targetId = legacyDemoClassMap[rawClass];
+      if (validClassIds.has(targetId)) {
+        changed = true;
+        return { ...s, classId: targetId };
+      }
+    }
+    // 4. Otherwise assign to defaultClassId
+    if (classes.length > 0) {
+      changed = true;
+      return { ...s, classId: defaultClassId };
+    }
+    return s;
+  });
+
+  if (changed) {
+    setStored(STORAGE_KEYS.STUDENTS, list);
+  }
+
+  return list;
+}
+
 /**
  * Reassigns all students from one class to another
  */
@@ -269,13 +338,40 @@ export async function syncAllClassesWithData(): Promise<{ studentsSynced: number
   const validClassIds = new Set(classes.map((c) => c.id));
   const fallbackClassId = classes[0].id;
 
+  const classByName = new Map<string, string>();
+  classes.forEach((c) => {
+    classByName.set(c.name.toLowerCase(), c.id);
+  });
+
+  const legacyDemoClassMap: Record<string, string> = {
+    'x-a': 'cls-1',
+    'x-b': 'cls-2',
+    'xi-mipa 1': 'cls-3',
+    'xi-mipa 2': 'cls-4',
+    'xii-mipa 1': 'cls-5',
+    'x-1': 'cls-1',
+    'x-2': 'cls-2',
+    'xi-1': 'cls-3',
+    'xi-2': 'cls-4',
+    'xii-1': 'cls-5',
+  };
+
   // 1. Sync Students
   const students = getStudents();
   let studentsSynced = 0;
   students.forEach((s) => {
+    const rawClass = (s.classId || '').trim().toLowerCase();
     if (!validClassIds.has(s.classId)) {
-      s.classId = fallbackClassId;
-      studentsSynced++;
+      if (classByName.has(rawClass)) {
+        s.classId = classByName.get(rawClass)!;
+        studentsSynced++;
+      } else if (legacyDemoClassMap[rawClass] && validClassIds.has(legacyDemoClassMap[rawClass])) {
+        s.classId = legacyDemoClassMap[rawClass];
+        studentsSynced++;
+      } else {
+        s.classId = fallbackClassId;
+        studentsSynced++;
+      }
     }
   });
   if (studentsSynced > 0) {
@@ -347,12 +443,6 @@ export async function savePeriods(periods: PeriodTime[]): Promise<void> {
   }
 }
 
-// -------------------------------------------------------------
-// STUDENTS (DATA MURID)
-// -------------------------------------------------------------
-export function getStudents(): Student[] {
-  return getStored<Student[]>(STORAGE_KEYS.STUDENTS, DEFAULT_STUDENTS);
-}
 
 export async function saveStudent(student: Student): Promise<void> {
   const list = getStudents();

@@ -144,6 +144,16 @@ export default function App() {
     }
   }, [mentoringJournals.length]);
 
+  // Auto-sync class and student integrity on app mount to prevent demo mismatches
+  useEffect(() => {
+    syncAllClassesWithData().then((res) => {
+      if (res.studentsSynced > 0 || res.journalsSynced > 0) {
+        setStudents(getStudents());
+        setJournals(getJournals());
+      }
+    });
+  }, []);
+
   // Reload all states from storage helper
   const reloadAllLocalData = () => {
     setSettings(getSettings());

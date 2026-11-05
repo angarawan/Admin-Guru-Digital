@@ -55,23 +55,29 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     }
   }, [settings.subject]);
 
-  // Active attendance state for students in selected class
+  // Active attendance state for students in selected class (supports '' for neutral/unselected)
   const [studentStatuses, setStudentStatuses] = useState<
-    Record<string, { status: AttendanceStatus; notes: string }>
+    Record<string, { status: AttendanceStatus | ''; notes: string }>
   >({});
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter students by active & class
+  // Filter students by active & class with fallback name match to guarantee sync
   const classStudents = useMemo(() => {
+    const curCls = classes.find((c) => c.id === selectedClassId);
     return students
-      .filter((s) => s.classId === selectedClassId && s.isActive)
+      .filter((s) => {
+        if (!s.isActive) return false;
+        if (s.classId === selectedClassId) return true;
+        if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+        return false;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [students, selectedClassId]);
+  }, [students, selectedClassId, classes]);
 
-  // When date, class, or period changes, load existing records if already saved!
+  // When date, class, or period changes, load existing records if already saved
   useEffect(() => {
-    const initialMap: Record<string, { status: AttendanceStatus; notes: string }> = {};
+    const initialMap: Record<string, { status: AttendanceStatus | ''; notes: string }> = {};
 
     classStudents.forEach((student) => {
       // Find if record exists for this date, class, period, and student
@@ -89,9 +95,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           notes: existing.notes || '',
         };
       } else {
-        // Default to 'H' (Hadir)
+        // Neutral initial state: allow selecting one by one without forcing all to 'H'
         initialMap[student.id] = {
-          status: 'H',
+          status: '',
           notes: '',
         };
       }
@@ -101,9 +107,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     setSaveSuccessMessage(null);
   }, [selectedDate, selectedClassId, selectedPeriod, classStudents, existingAttendance]);
 
-  // Mark All Present (Hadir Semua)
+  // Mark All Present (Hadirkan Semua Murid)
   const handleMarkAllPresent = () => {
-    const updated: Record<string, { status: AttendanceStatus; notes: string }> = {};
+    const updated: Record<string, { status: AttendanceStatus | ''; notes: string }> = {};
     classStudents.forEach((s) => {
       updated[s.id] = {
         status: 'H',
@@ -113,21 +119,38 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     setStudentStatuses(updated);
   };
 
+  // Reset / Clear All (Kosongkan Pilihan Semua)
+  const handleClearAll = () => {
+    const updated: Record<string, { status: AttendanceStatus | ''; notes: string }> = {};
+    classStudents.forEach((s) => {
+      updated[s.id] = {
+        status: '',
+        notes: studentStatuses[s.id]?.notes || '',
+      };
+    });
+    setStudentStatuses(updated);
+  };
+
+  // Toggle status for individual student: clicking the same active status deselects it!
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
-    setStudentStatuses((prev) => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        status,
-      },
-    }));
+    setStudentStatuses((prev) => {
+      const current = prev[studentId];
+      const nextStatus: AttendanceStatus | '' = current?.status === status ? '' : status;
+      return {
+        ...prev,
+        [studentId]: {
+          status: nextStatus,
+          notes: current?.notes || '',
+        },
+      };
+    });
   };
 
   const handleNotesChange = (studentId: string, notes: string) => {
     setStudentStatuses((prev) => ({
       ...prev,
       [studentId]: {
-        ...prev[studentId],
+        status: prev[studentId]?.status || '',
         notes,
       },
     }));
@@ -139,19 +162,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     let sakit = 0;
     let izin = 0;
     let alpa = 0;
+    let belum = 0;
 
     classStudents.forEach((s) => {
-      const st = studentStatuses[s.id]?.status || 'H';
+      const st = studentStatuses[s.id]?.status;
       if (st === 'H') hadir++;
       else if (st === 'S') sakit++;
       else if (st === 'I') izin++;
       else if (st === 'A') alpa++;
+      else belum++;
     });
 
     const total = classStudents.length;
     const persentase = total > 0 ? Math.round((hadir / total) * 100) : 0;
 
-    return { total, hadir, sakit, izin, alpa, persentase };
+    return { total, hadir, sakit, izin, alpa, belum, persentase };
   }, [classStudents, studentStatuses]);
 
   // Save Attendance Handler
@@ -165,9 +190,17 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     setSaveSuccessMessage(null);
 
     try {
+      let defaultHadirCount = 0;
       const recordsToSave: AttendanceRecord[] = classStudents.map((student) => {
-        const item = studentStatuses[student.id] || { status: 'H', notes: '' };
-        // Check if existing ID is already present to prevent duplicate row IDs
+        const item = studentStatuses[student.id];
+        // If teacher left student unselected, automatically treat as 'H' (Hadir) on save
+        let finalStatus: AttendanceStatus = 'H';
+        if (item?.status) {
+          finalStatus = item.status;
+        } else {
+          defaultHadirCount++;
+        }
+
         const existing = existingAttendance.find(
           (a) =>
             a.date === selectedDate &&
@@ -184,18 +217,19 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           period: selectedPeriod,
           studentId: student.id,
           studentName: student.name,
-          status: item.status,
-          notes: item.notes,
+          status: finalStatus,
+          notes: item?.notes || '',
           academicYear: settings.academicYear,
           semester: settings.semester,
         };
       });
 
       await onSaveAttendanceBatch(recordsToSave);
+      const className = classes.find((c) => c.id === selectedClassId)?.name || selectedClassId;
       setSaveSuccessMessage(
-        `Absensi tanggal ${selectedDate} kelas ${
-          classes.find((c) => c.id === selectedClassId)?.name
-        } berhasil disimpan!`
+        `Absensi tanggal ${selectedDate} kelas ${className} berhasil disimpan!${
+          defaultHadirCount > 0 ? ` (${defaultHadirCount} murid tanpa tanda otomatis dihitung Hadir)` : ''
+        }`
       );
     } catch (err: any) {
       alert('Gagal menyimpan absensi: ' + err.message);
@@ -290,7 +324,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
       {/* Attendance Form & Students Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 gap-2.5">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-800 dark:text-white">
               Daftar Murid Kelas {classes.find((c) => c.id === selectedClassId)?.name}
@@ -298,14 +332,35 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             <span className="text-xs text-slate-500 dark:text-slate-400">({classStudents.length} murid terdaftar)</span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleMarkAllPresent}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Hadir Semua
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+              title="Kosongkan semua tanda status agar bisa memilih satu per satu"
+            >
+              Kosongkan Pilihan
+            </button>
+            <button
+              type="button"
+              onClick={handleMarkAllPresent}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+              title="Set seluruh murid menjadi Hadir (H)"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Hadirkan Semua
+            </button>
+          </div>
+        </div>
+
+        {/* Helpful User Instruction Notice */}
+        <div className="px-4 py-2 bg-blue-50/60 dark:bg-blue-950/30 border-b border-blue-100 dark:border-blue-900/40 text-[11px] text-blue-800 dark:text-blue-300 flex items-center justify-between flex-wrap gap-2">
+          <span>
+            💡 <strong>Panduan:</strong> Klik tombol status (<strong>H / S / I / A</strong>) untuk memilih per murid. Klik kembali tombol yang aktif untuk membatalkan (unselect).
+          </span>
+          <span className="text-slate-500 dark:text-slate-400">
+            *Murid tanpa tanda otomatis dihitung <strong>Hadir</strong> saat disimpan.
+          </span>
         </div>
 
         <div className="overflow-x-auto">
@@ -332,7 +387,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {classStudents.length > 0 ? (
                 classStudents.map((student, idx) => {
-                  const current = studentStatuses[student.id] || { status: 'H', notes: '' };
+                  const current = studentStatuses[student.id] || { status: '', notes: '' };
                   return (
                     <tr
                       key={student.id}
@@ -350,10 +405,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'H')}
-                          title={`${student.name}: Hadir (H)`}
-                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                          title={`${student.name}: Hadir (H) - Klik untuk memilih / klik lagi untuk batal`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all cursor-pointer ${
                             current.status === 'H'
-                              ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-300 dark:ring-emerald-700 font-extrabold'
+                              ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-300 dark:ring-emerald-700 font-black scale-105'
                               : 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
@@ -366,10 +421,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'S')}
-                          title={`${student.name}: Sakit (S)`}
-                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                          title={`${student.name}: Sakit (S) - Klik untuk memilih / klik lagi untuk batal`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all cursor-pointer ${
                             current.status === 'S'
-                              ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300 dark:ring-blue-700 font-extrabold'
+                              ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300 dark:ring-blue-700 font-black scale-105'
                               : 'text-slate-400 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
@@ -382,10 +437,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'I')}
-                          title={`${student.name}: Izin (I)`}
-                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                          title={`${student.name}: Izin (I) - Klik untuk memilih / klik lagi untuk batal`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all cursor-pointer ${
                             current.status === 'I'
-                              ? 'bg-amber-500 text-white shadow-xs ring-2 ring-amber-300 dark:ring-amber-700 font-extrabold'
+                              ? 'bg-amber-500 text-white shadow-xs ring-2 ring-amber-300 dark:ring-amber-700 font-black scale-105'
                               : 'text-slate-400 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
@@ -398,10 +453,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'A')}
-                          title={`${student.name}: Alpa (A)`}
-                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all ${
+                          title={`${student.name}: Alpa (A) - Klik untuk memilih / klik lagi untuk batal`}
+                          className={`w-7 h-7 rounded-md font-bold text-xs inline-flex items-center justify-center transition-all cursor-pointer ${
                             current.status === 'A'
-                              ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-300 dark:ring-rose-700 font-extrabold'
+                              ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-300 dark:ring-rose-700 font-black scale-105'
                               : 'text-slate-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
@@ -454,17 +509,33 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 <span>Alpa:</span>
                 <strong className="font-bold tabular-nums">{stats.alpa}</strong>
               </div>
+              {stats.belum > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs" title="Murid yang belum dipilih statusnya akan otomatis dihitung Hadir saat Anda menekan tombol Simpan">
+                  <span>Belum Dipilih:</span>
+                  <strong className="font-bold tabular-nums">{stats.belum}</strong>
+                </div>
+              )}
             </div>
 
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleSaveAttendance}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors justify-center self-end sm:self-auto"
-            >
-              <Save className="w-4 h-4" />
-              {isSubmitting ? 'Menyimpan...' : 'Simpan Absensi'}
-            </button>
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={handleMarkAllPresent}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Hadirkan Semua
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleSaveAttendance}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors justify-center cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                {isSubmitting ? 'Menyimpan...' : 'Simpan Absensi'}
+              </button>
+            </div>
           </div>
         )}
       </div>

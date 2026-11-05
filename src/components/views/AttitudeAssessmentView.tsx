@@ -81,10 +81,16 @@ export const AttitudeAssessmentView: React.FC<AttitudeAssessmentViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const classStudents = useMemo(() => {
+    const curCls = classes.find((c) => c.id === selectedClassId);
     return students
-      .filter((s) => s.classId === selectedClassId && s.isActive)
+      .filter((s) => {
+        if (!s.isActive) return false;
+        if (s.classId === selectedClassId) return true;
+        if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+        return false;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [students, selectedClassId]);
+  }, [students, selectedClassId, classes]);
 
   // Compute category label from average score
   const getCategoryLabel = (scores: Record<string, number>): string => {

@@ -142,12 +142,18 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
   // Filter tab for student selection in Langkah 2: 'ungraded' (default) | 'graded' | 'all'
   const [filterGradedStatus, setFilterGradedStatus] = useState<'ungraded' | 'all' | 'graded'>('ungraded');
 
-  // All active students for selected class (sorted alphabetically)
+  // All active students for selected class (sorted alphabetically with class name fallback)
   const classStudents = useMemo(() => {
+    const curCls = classes.find((c) => c.id === selectedClassId);
     return students
-      .filter((s) => s.classId === selectedClassId && s.isActive)
+      .filter((s) => {
+        if (!s.isActive) return false;
+        if (s.classId === selectedClassId) return true;
+        if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+        return false;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [students, selectedClassId]);
+  }, [students, selectedClassId, classes]);
 
   // Set of student IDs already evaluated & saved for this class, topic, and practice type
   const alreadyGradedStudentIds = useMemo(() => {

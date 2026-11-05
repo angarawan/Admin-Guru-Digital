@@ -53,11 +53,16 @@ export const AssessmentReportView: React.FC<AssessmentReportViewProps> = ({
     }
   }, [classes, selectedClassId]);
 
-  // Filter students
+  // Filter students with class name fallback
   const filteredStudents = useMemo(() => {
     if (selectedClassId === 'all') return students;
-    return students.filter((s) => s.classId === selectedClassId);
-  }, [students, selectedClassId]);
+    const curCls = classes.find((c) => c.id === selectedClassId);
+    return students.filter((s) => {
+      if (s.classId === selectedClassId) return true;
+      if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+      return false;
+    });
+  }, [students, selectedClassId, classes]);
 
   // Filter assessments
   const filteredKnowledge = useMemo(() => {

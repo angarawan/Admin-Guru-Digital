@@ -857,7 +857,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               isOpen={isEditModalOpen}
               onClose={() => setIsEditModalOpen(false)}
               title={editingClass ? `Ubah Data Kelas: ${editingClass.name}` : 'Ubah Kelas'}
-              maxWidth="max-w-md"
+              maxWidth="md"
             >
               {editingClass && (
                 <form onSubmit={handleSaveEditClass} className="space-y-4">

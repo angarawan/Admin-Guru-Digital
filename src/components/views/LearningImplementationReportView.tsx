@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileText,
   Printer,
@@ -56,11 +56,16 @@ export const LearningImplementationReportView: React.FC<LearningImplementationRe
     }
   }, [classes, selectedClassId]);
 
-  // Filter students based on class selection
+  // Filter students based on class selection with name fallback
   const filteredStudents = useMemo(() => {
     if (selectedClassId === 'all') return students;
-    return students.filter((s) => s.classId === selectedClassId);
-  }, [students, selectedClassId]);
+    const curCls = classes.find((c) => c.id === selectedClassId);
+    return students.filter((s) => {
+      if (s.classId === selectedClassId) return true;
+      if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+      return false;
+    });
+  }, [students, selectedClassId, classes]);
 
   // Filter journals
   const filteredJournals = useMemo(() => {

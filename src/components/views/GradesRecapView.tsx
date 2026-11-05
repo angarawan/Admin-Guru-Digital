@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart3,
   Download,
@@ -53,12 +53,17 @@ export const GradesRecapView: React.FC<GradesRecapViewProps> = ({
 
   const activeClass = classes.find((c) => c.id === selectedClassId);
 
-  // Filter students
+  // Filter students with class name fallback
   const classStudents = useMemo(() => {
     return students
-      .filter((s) => s.classId === selectedClassId && s.isActive)
+      .filter((s) => {
+        if (!s.isActive) return false;
+        if (s.classId === selectedClassId) return true;
+        if (activeClass && s.classId.toLowerCase() === activeClass.name.toLowerCase()) return true;
+        return false;
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [students, selectedClassId]);
+  }, [students, selectedClassId, activeClass]);
 
   // Extract distinct topics
   const knowledgeTopics = useMemo(() => {
