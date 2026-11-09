@@ -33,6 +33,7 @@ interface KnowledgeAssessmentViewProps {
   onSaveAssessmentBatch: (records: KnowledgeAssessment[]) => Promise<void>;
   onDeleteAssessment: (id: string) => Promise<void>;
   onBatchDeleteAssessments?: (ids: string[]) => Promise<void>;
+  onNavigateToDashboard?: () => void;
 }
 
 interface UploadPreviewItem {
@@ -53,6 +54,7 @@ export const KnowledgeAssessmentView: React.FC<KnowledgeAssessmentViewProps> = (
   onSaveAssessmentBatch,
   onDeleteAssessment,
   onBatchDeleteAssessments,
+  onNavigateToDashboard,
 }) => {
   const assessmentTypes: KnowledgeAssessment['assessmentType'][] = [
     'Formatif',
@@ -493,7 +495,12 @@ export const KnowledgeAssessmentView: React.FC<KnowledgeAssessmentViewProps> = (
       });
 
       await onSaveAssessmentBatch(recordsToSave);
-      setSaveSuccessMsg(`Nilai pengetahuan "${topic}" (${assessmentType}) berhasil disimpan!`);
+      setSaveSuccessMsg(`Nilai pengetahuan "${topic}" (${assessmentType}) berhasil disimpan! Mengalihkan ke menu dashboard...`);
+      if (onNavigateToDashboard) {
+        setTimeout(() => {
+          onNavigateToDashboard();
+        }, 1200);
+      }
     } catch (e: any) {
       alert('Gagal menyimpan nilai: ' + e.message);
     } finally {

@@ -25,6 +25,7 @@ interface JournalViewProps {
   onSaveJournal: (journal: TeachingJournal) => Promise<void>;
   onDeleteJournal: (id: string) => Promise<void>;
   onBatchDeleteJournals?: (ids: string[]) => Promise<void>;
+  onNavigateToDashboard?: () => void;
 }
 
 // Preset Kata-kata Hasil Pembelajaran & Capaian (PJOK)
@@ -161,6 +162,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
   onSaveJournal,
   onDeleteJournal,
   onBatchDeleteJournals,
+  onNavigateToDashboard,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('all');
@@ -402,6 +404,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     await onSaveJournal(journal);
     setIsModalOpen(false);
+
+    if (onNavigateToDashboard) {
+      setTimeout(() => {
+        onNavigateToDashboard();
+      }, 500);
+    }
   };
 
   const handleDelete = async (journal: TeachingJournal) => {

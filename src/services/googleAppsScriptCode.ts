@@ -24,7 +24,7 @@ const SHEET_DEFINITIONS = {
   "Nilai_Keterampilan": ["id", "date", "classId", "subject", "topic", "practiceType", "studentId", "studentName", "indicators_json", "finalScore", "notes", "feedback", "academicYear", "semester", "updated_at"],
   "Nilai_Sikap": ["id", "date", "classId", "subject", "studentId", "studentName", "scores_json", "behaviorNotes", "observationDate", "resultSummary", "academicYear", "semester", "updated_at"],
   "Indikator_Penilaian": ["id", "category", "name", "weight", "description", "updated_at"],
-  "Jurnal_Pendampingan": ["id", "journalNumber", "date", "studentId", "studentName", "classId", "problemType", "problemDescription", "identificationResult", "mentoringSteps", "mutualAgreement", "followUp", "status", "nextEvaluationDate", "mentorTeacher", "teacherSignature", "studentSignature", "updated_at"],
+  "Jurnal_Pendampingan": ["id", "journalNumber", "date", "studentId", "studentName", "classId", "problemType", "problemDescription", "identificationResult", "mentoringSteps", "mutualAgreement", "followUp", "status", "nextEvaluationDate", "mentorTeacher", "teacherSignature", "studentSignature", "documentationPhoto", "gpsCoordinates_json", "updated_at"],
   "Kartu_Refleksi": ["id", "date", "classId", "studentId", "studentName", "topic", "understood", "difficulties", "interestingParts", "improvements", "emotion", "teacherNotes", "followUp", "academicYear", "semester", "updated_at"]
 };
 

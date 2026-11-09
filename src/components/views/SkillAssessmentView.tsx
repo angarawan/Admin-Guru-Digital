@@ -42,6 +42,7 @@ interface SkillAssessmentViewProps {
   onSaveAssessmentBatch: (records: SkillAssessment[]) => Promise<void>;
   onDeleteAssessment: (id: string) => Promise<void>;
   onBatchDeleteAssessments?: (ids: string[]) => Promise<void>;
+  onNavigateToDashboard?: () => void;
 }
 
 export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
@@ -53,6 +54,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
   onSaveAssessmentBatch,
   onDeleteAssessment,
   onBatchDeleteAssessments,
+  onNavigateToDashboard,
 }) => {
   const practiceTypes = [
     'Praktik Gerak Dasar / Unjuk Kerja',
@@ -230,19 +232,71 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
     return classStudents.filter((s) => selectedStudentIds.includes(s.id));
   }, [classStudents, selectedStudentIds]);
 
-  // Calculate final score helper (0 - 100)
-  const calculateFinalScore = (scores: number[]): number => {
+  // Calculate final score mapped to rubric brackets & randomized with daily attendance sync:
+  // Rubric 4: 86 - 90
+  // Rubric 3: 81 - 85
+  // Rubric 2: 75 - 80
+  // Rubric 1: 70 - 74
+  const calculateFinalScore = (scores: number[], studentId?: string): number => {
     let weightedSum = 0;
     let maxWeightedSum = 0;
 
     indicators.forEach((ind, idx) => {
-      const score = scores[idx] || 3;
+      const score = scores[idx] !== undefined ? scores[idx] : 3;
       weightedSum += score * ind.weight;
       maxWeightedSum += 4 * ind.weight;
     });
 
-    if (maxWeightedSum === 0) return 0;
-    return Math.round((weightedSum / maxWeightedSum) * 100);
+    if (maxWeightedSum === 0) return 80;
+
+    // Average rubric rating (1.0 to 4.0)
+    const avgRating = (weightedSum / maxWeightedSum) * 4;
+
+    // Mapped score ranges based on user specifications:
+    // 4 -> 86-90, 3 -> 81-85, 2 -> 75-80, 1 -> 70-74
+    let minScore = 81;
+    let maxScore = 85;
+
+    if (avgRating >= 3.5) {
+      minScore = 86;
+      maxScore = 90;
+    } else if (avgRating >= 2.5) {
+      minScore = 81;
+      maxScore = 85;
+    } else if (avgRating >= 1.5) {
+      minScore = 75;
+      maxScore = 80;
+    } else {
+      minScore = 70;
+      maxScore = 74;
+    }
+
+    // Attendance synchronization:
+    // Analyze student's daily attendance records in this class
+    let attendanceRate = 0.9;
+    if (studentId) {
+      const stAttendance = attendance.filter((a) => a.studentId === studentId);
+      if (stAttendance.length > 0) {
+        const hadirCount = stAttendance.filter((a) => a.status === 'H').length;
+        attendanceRate = hadirCount / stAttendance.length;
+      }
+    }
+
+    // Deterministic pseudo-random variation based on student ID, topic, and date
+    // Ensures scores are pleasantly randomized within the bracket without bouncing on re-renders
+    const seed = `${studentId || 'std'}-${topic}-${assessmentDate || ''}`;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    const pseudoRand = Math.abs(Math.sin(hash + 3141.59) * 10000) % 1;
+
+    // Blend: 70% attendance factor + 30% randomized jitter
+    const factor = Math.min(1, Math.max(0, attendanceRate * 0.7 + pseudoRand * 0.3));
+    const finalScore = Math.round(minScore + factor * (maxScore - minScore));
+
+    return Math.min(maxScore, Math.max(minScore, finalScore));
   };
 
   // Helper score label
@@ -479,7 +533,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
           weight: ind.weight,
         }));
 
-        const finalScore = calculateFinalScore(item.scores);
+        const finalScore = calculateFinalScore(item.scores, st.id);
         const existing = existingAssessments.find(
           (a) =>
             a.classId === selectedClassId &&
@@ -511,8 +565,13 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
       setSessionSavedStudentIds((prev) => Array.from(new Set([...prev, ...savedIds])));
       setSelectedStudentIds([]); // clear chosen students so teacher can choose other names without repetition
       setSaveSuccessMsg(
-        `Nilai keterampilan untuk ${recordsToSave.length} murid berhasil disimpan! Murid tersebut sudah ditandai dan disembunyikan dari daftar pemilihan nama berikutnya.`
+        `Nilai keterampilan untuk ${recordsToSave.length} murid berhasil disimpan! Mengalihkan ke menu dashboard...`
       );
+      if (onNavigateToDashboard) {
+        setTimeout(() => {
+          onNavigateToDashboard();
+        }, 1200);
+      }
     } catch (err: any) {
       alert('Gagal menyimpan nilai keterampilan: ' + (err?.message || 'Terjadi kesalahan'));
     } finally {
@@ -1181,7 +1240,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
                           notes: 'Tuntas',
                         };
                         const currentScore = item.scores[indIdx] || 3;
-                        const finalScore = calculateFinalScore(item.scores);
+                        const finalScore = calculateFinalScore(item.scores, st.id);
                         const isPresent = presentStudentIds.has(st.id);
 
                         return (
@@ -1257,7 +1316,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
                     feedback: feedbackPresets[1],
                     notes: 'Tuntas',
                   };
-                  const finalScore = calculateFinalScore(item.scores);
+                  const finalScore = calculateFinalScore(item.scores, st.id);
                   const isPresent = presentStudentIds.has(st.id);
 
                   return (
@@ -1418,7 +1477,7 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
                           feedback: feedbackPresets[1],
                           notes: 'Tuntas',
                         };
-                        const final = calculateFinalScore(item.scores);
+                        const final = calculateFinalScore(item.scores, st.id);
                         const isPresent = presentStudentIds.has(st.id);
 
                         return (

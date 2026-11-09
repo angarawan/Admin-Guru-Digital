@@ -175,6 +175,14 @@ export interface MentoringJournal {
   mentorTeacher: string;
   teacherSignature: string; // Base64 data or Google Drive link
   studentSignature: string; // Base64 data or Google Drive link
+  documentationPhoto?: string; // Stamped base64 photo or photo link
+  gpsCoordinates?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    timestamp?: string;
+    address?: string;
+  };
 }
 
 export type ReflectionEmotion = 'Senang' | 'Biasa saja' | 'Kesulitan';

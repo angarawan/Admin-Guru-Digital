@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   UserCheck,
   Plus,
@@ -15,6 +15,12 @@ import {
   Clock,
   AlertTriangle,
   RotateCcw,
+  Camera,
+  MapPin,
+  ExternalLink,
+  Upload,
+  Loader2,
+  Check,
 } from 'lucide-react';
 import {
   MentoringJournal,
@@ -35,6 +41,7 @@ interface MentoringJournalViewProps {
   onDeleteJournal: (id: string) => Promise<void>;
   onBatchDeleteJournals?: (ids: string[]) => Promise<void>;
   onResetDefaultJournals?: () => void;
+  onNavigateToDashboard?: () => void;
 }
 
 export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
@@ -46,6 +53,7 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
   onDeleteJournal,
   onBatchDeleteJournals,
   onResetDefaultJournals,
+  onNavigateToDashboard,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -58,6 +66,11 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
   const [activeJournal, setActiveJournal] = useState<MentoringJournal | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState<Partial<MentoringJournal>>({
@@ -77,6 +90,8 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
     mentorTeacher: settings.teacherName,
     teacherSignature: '',
     studentSignature: '',
+    documentationPhoto: '',
+    gpsCoordinates: undefined,
   });
 
   const handleStudentSelect = (studentId: string) => {
@@ -91,6 +106,134 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
     }
   };
 
+  // Acquire high accuracy GPS location
+  const getGpsLocation = (): Promise<{ latitude: number; longitude: number; accuracy: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        setGpsErrorMsg('Perangkat tidak mendukung geolokasi GPS.');
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGpsErrorMsg(null);
+          resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          });
+        },
+        (err) => {
+          console.warn('GPS location request notice:', err.message);
+          setGpsErrorMsg('Izin GPS tidak diberikan atau sinyal lemah. Foto tetap diproses dengan penanda waktu.');
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    });
+  };
+
+  // Process and stamp documentation photo with GPS watermark
+  const handleCaptureImage = async (file: File) => {
+    if (!file) return;
+    setIsProcessingPhoto(true);
+    setGpsErrorMsg(null);
+
+    try {
+      const gps = await getGpsLocation();
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            setIsProcessingPhoto(false);
+            return;
+          }
+
+          // Render captured photo
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Render sleek bottom banner for authentic GPS watermark
+          const bannerHeight = Math.max(74, Math.round(h * 0.16));
+          const gradient = ctx.createLinearGradient(0, h - bannerHeight, 0, h);
+          gradient.addColorStop(0, 'rgba(15, 23, 42, 0.78)');
+          gradient.addColorStop(1, 'rgba(15, 23, 42, 0.96)');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, h - bannerHeight, w, bannerHeight);
+
+          // Accent top border
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(0, h - bannerHeight);
+          ctx.lineTo(w, h - bannerHeight);
+          ctx.stroke();
+
+          // Text metrics
+          const baseSize = Math.max(12, Math.round(w * 0.024));
+          ctx.font = `bold ${baseSize}px sans-serif`;
+          ctx.fillStyle = '#38bdf8';
+          const title = gps ? '📍 DOKUMENTASI TERVERIFIKASI GPS' : '📷 DOKUMENTASI PENDAMPINGAN';
+          ctx.fillText(title, 16, h - bannerHeight + baseSize + 6);
+
+          ctx.font = `normal ${Math.max(10, Math.round(baseSize * 0.85))}px monospace`;
+          ctx.fillStyle = '#f8fafc';
+          const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
+          const gpsText = gps
+            ? `GPS: ${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)} (±${Math.round(gps.accuracy)}m)`
+            : 'GPS: Lokasi Manual (Izin Dinonaktifkan)';
+          ctx.fillText(`${nowStr} · ${gpsText}`, 16, h - bannerHeight + baseSize * 2 + 10);
+
+          ctx.font = `normal ${Math.max(10, Math.round(baseSize * 0.82))}px sans-serif`;
+          ctx.fillStyle = '#cbd5e1';
+          const selectedStudent = students.find((s) => s.id === formData.studentId);
+          const studentDisplayName = selectedStudent?.name || formData.studentName || 'Siswa';
+          const teacherDisplayName = formData.mentorTeacher || settings.teacherName;
+          ctx.fillText(`Guru: ${teacherDisplayName} | Murid: ${studentDisplayName}`, 16, h - bannerHeight + baseSize * 3 + 14);
+
+          const stampedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+          setFormData((prev) => ({
+            ...prev,
+            documentationPhoto: stampedBase64,
+            gpsCoordinates: gps
+              ? {
+                  latitude: gps.latitude,
+                  longitude: gps.longitude,
+                  accuracy: gps.accuracy,
+                  timestamp: new Date().toISOString(),
+                }
+              : undefined,
+          }));
+          setIsProcessingPhoto(false);
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error processing photo:', err);
+      setIsProcessingPhoto(false);
+    }
+  };
+
   React.useEffect(() => {
     if (journals.length === 0 && onResetDefaultJournals) {
       onResetDefaultJournals();
@@ -100,6 +243,7 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
   const openAddModal = () => {
     setEditingJournal(null);
     const firstStudent = students[0];
+    setGpsErrorMsg(null);
     setFormData({
       journalNumber: `JPM/${new Date().getFullYear()}/${String(journals.length + 1).padStart(3, '0')}`,
       date: todayStr,
@@ -117,12 +261,15 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
       mentorTeacher: settings.teacherName,
       teacherSignature: '',
       studentSignature: '',
+      documentationPhoto: '',
+      gpsCoordinates: undefined,
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = (journal: MentoringJournal) => {
     setEditingJournal(journal);
+    setGpsErrorMsg(null);
     setFormData({ ...journal });
     setIsModalOpen(true);
   };
@@ -162,10 +309,18 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
       mentorTeacher: formData.mentorTeacher || settings.teacherName,
       teacherSignature: formData.teacherSignature || '',
       studentSignature: formData.studentSignature || '',
+      documentationPhoto: formData.documentationPhoto || '',
+      gpsCoordinates: formData.gpsCoordinates,
     };
 
     await onSaveJournal(item);
     setIsModalOpen(false);
+
+    if (onNavigateToDashboard) {
+      setTimeout(() => {
+        onNavigateToDashboard();
+      }, 500);
+    }
   };
 
   const handleDelete = async (journal: MentoringJournal) => {
@@ -431,6 +586,12 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
                       )}
                       TTD Siswa
                     </span>
+                    {jr.documentationPhoto && (
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                        <MapPin className="w-3.5 h-3.5" />
+                        Foto GPS
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -725,6 +886,158 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
             </div>
           </div>
 
+          {/* Dokumentasi Foto Langsung & GPS Geolocation */}
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <Camera className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Dokumentasi Foto & Validasi Lokasi GPS
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Ambil foto langsung kamera HP/laptop atau unggah berkas. Koordinat GPS, tanggal-waktu, dan identitas akan distempel otomatis pada foto.
+                </p>
+              </div>
+            </div>
+
+            {/* Hidden file inputs */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleCaptureImage(file);
+                e.target.value = '';
+              }}
+            />
+            <input
+              type="file"
+              ref={galleryInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleCaptureImage(file);
+                e.target.value = '';
+              }}
+            />
+
+            {gpsErrorMsg && (
+              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{gpsErrorMsg}</span>
+              </div>
+            )}
+
+            {isProcessingPhoto ? (
+              <div className="p-5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 flex items-center justify-center gap-2.5 text-xs font-semibold text-blue-700 dark:text-blue-300 animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+                <span>Mendeteksi koordinat GPS presisi dan memproses stempel foto...</span>
+              </div>
+            ) : formData.documentationPhoto ? (
+              <div className="space-y-2">
+                <div className="relative rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-900 group">
+                  <img
+                    src={formData.documentationPhoto}
+                    alt="Dokumentasi Pendampingan"
+                    className="w-full max-h-72 object-contain bg-slate-950/80 mx-auto"
+                  />
+                  <div className="absolute top-2 right-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, documentationPhoto: '', gpsCoordinates: undefined }))}
+                      className="px-2.5 py-1 rounded-lg bg-rose-600/90 hover:bg-rose-700 text-white shadow-md text-xs font-semibold flex items-center gap-1"
+                      title="Hapus Foto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Foto</span>
+                    </button>
+                  </div>
+                </div>
+
+                {formData.gpsCoordinates && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs">
+                    <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
+                      <MapPin className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      <span className="font-mono font-medium">
+                        GPS: {formData.gpsCoordinates.latitude.toFixed(6)}, {formData.gpsCoordinates.longitude.toFixed(6)} (±{Math.round(formData.gpsCoordinates.accuracy || 0)}m)
+                      </span>
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps?q=${formData.gpsCoordinates.latitude},${formData.gpsCoordinates.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-300 hover:underline"
+                    >
+                      <span>Buka di Google Maps</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-blue-600" />
+                    Foto Ulang (Kamera)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                    Ganti dari Berkas
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="p-4 rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-blue-500 bg-blue-50/40 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-900/30 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xs font-bold text-slate-900 dark:text-white">
+                      Ambil Foto Langsung (Kamera)
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Buka kamera ponsel/laptop + GPS otomatis
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="p-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xs font-bold text-slate-900 dark:text-white">
+                      Unggah dari Galeri / Berkas
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Pilih foto dokumentasi yang sudah tersimpan
+                    </span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
@@ -835,6 +1148,39 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Display Documentation Photo with GPS */}
+            {activeJournal.documentationPhoto && (
+              <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/70 space-y-2">
+                <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs flex items-center gap-1.5">
+                  <Camera className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Foto Dokumentasi & Verifikasi Lokasi GPS:
+                </span>
+                <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-950">
+                  <img
+                    src={activeJournal.documentationPhoto}
+                    alt="Foto Pendampingan"
+                    className="w-full max-h-80 object-contain mx-auto"
+                  />
+                </div>
+                {activeJournal.gpsCoordinates && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px]">
+                    <span className="font-mono text-emerald-800 dark:text-emerald-300 font-medium flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      GPS: {activeJournal.gpsCoordinates.latitude.toFixed(6)}, {activeJournal.gpsCoordinates.longitude.toFixed(6)} (±{Math.round(activeJournal.gpsCoordinates.accuracy || 0)}m)
+                    </span>
+                    <a
+                      href={`https://www.google.com/maps?q=${activeJournal.gpsCoordinates.latitude},${activeJournal.gpsCoordinates.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-700 dark:text-emerald-300 font-semibold hover:underline inline-flex items-center gap-1"
+                    >
+                      Buka di Google Maps <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
@@ -957,6 +1303,27 @@ export const MentoringJournalView: React.FC<MentoringJournalViewProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Dokumentasi Foto & GPS pada Lembar Cetak */}
+              {activeJournal.documentationPhoto && (
+                <div className="space-y-1.5 border-t border-slate-200 pt-3">
+                  <h4 className="font-bold uppercase text-[11px] text-slate-700">
+                    Dokumentasi Fisik & Verifikasi Lokasi GPS:
+                  </h4>
+                  <div className="border border-slate-300 rounded p-1 bg-white inline-block max-w-full">
+                    <img
+                      src={activeJournal.documentationPhoto}
+                      alt="Dokumentasi"
+                      className="max-h-48 object-contain rounded"
+                    />
+                  </div>
+                  {activeJournal.gpsCoordinates && (
+                    <p className="text-[10px] text-slate-600 font-mono">
+                      Koordinat GPS Terverifikasi: {activeJournal.gpsCoordinates.latitude.toFixed(6)}, {activeJournal.gpsCoordinates.longitude.toFixed(6)} (Akurasi: ±{Math.round(activeJournal.gpsCoordinates.accuracy || 0)} m)
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Lembar Tanda Tangan */}
               <div className="grid grid-cols-2 gap-8 pt-8 font-sans text-xs">
