@@ -17,6 +17,7 @@ import {
   AttendanceStatus,
   AppSettings,
 } from '../../types';
+import { normalizeClassKey } from '../../services/storage';
 
 interface AttendanceViewProps {
   students: Student[];
@@ -25,6 +26,7 @@ interface AttendanceViewProps {
   settings: AppSettings;
   existingAttendance: AttendanceRecord[];
   onSaveAttendanceBatch: (records: AttendanceRecord[]) => Promise<void>;
+  onDeleteAttendanceBatch?: (ids: string[]) => Promise<void>;
 }
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({
@@ -34,6 +36,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   settings,
   existingAttendance,
   onSaveAttendanceBatch,
+  onDeleteAttendanceBatch,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -69,10 +72,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       .filter((s) => {
         if (!s.isActive) return false;
         if (s.classId === selectedClassId) return true;
-        if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+        if (curCls) {
+          if (s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+          return (
+            normalizeClassKey(s.classId) === normalizeClassKey(curCls.name) ||
+            normalizeClassKey(s.classId) === normalizeClassKey(curCls.id)
+          );
+        }
         return false;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
   }, [students, selectedClassId, classes]);
 
   // When date, class, or period changes, load existing records if already saved
@@ -190,16 +199,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     setSaveSuccessMessage(null);
 
     try {
-      let defaultHadirCount = 0;
-      const recordsToSave: AttendanceRecord[] = classStudents.map((student) => {
+      const recordsToSave: AttendanceRecord[] = [];
+      const recordsToDeleteIds: string[] = [];
+      let countH = 0;
+      let countS = 0;
+      let countI = 0;
+      let countA = 0;
+
+      classStudents.forEach((student) => {
         const item = studentStatuses[student.id];
-        // If teacher left student unselected, automatically treat as 'H' (Hadir) on save
-        let finalStatus: AttendanceStatus = 'H';
-        if (item?.status) {
-          finalStatus = item.status;
-        } else {
-          defaultHadirCount++;
-        }
+        const status = item?.status || '';
 
         const existing = existingAttendance.find(
           (a) =>
@@ -209,28 +218,53 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             a.studentId === student.id
         );
 
-        return {
-          id: existing ? existing.id : `att-${selectedDate}-${selectedClassId}-${selectedPeriod}-${student.id}`,
-          date: selectedDate,
-          classId: selectedClassId,
-          subject,
-          period: selectedPeriod,
-          studentId: student.id,
-          studentName: student.name,
-          status: finalStatus,
-          notes: item?.notes || '',
-          academicYear: settings.academicYear,
-          semester: settings.semester,
-        };
+        if (status) {
+          if (status === 'H') countH++;
+          else if (status === 'S') countS++;
+          else if (status === 'I') countI++;
+          else if (status === 'A') countA++;
+
+          recordsToSave.push({
+            id: existing ? existing.id : `att-${selectedDate}-${selectedClassId}-${selectedPeriod}-${student.id}`,
+            date: selectedDate,
+            classId: selectedClassId,
+            subject,
+            period: selectedPeriod,
+            studentId: student.id,
+            studentName: student.name,
+            status: status,
+            notes: item?.notes || '',
+            academicYear: settings.academicYear,
+            semester: settings.semester,
+          });
+        } else if (existing) {
+          // Jika murid dikosongkan tandanya dan sebelumnya ada catatan presensi tersimpan, hapus
+          recordsToDeleteIds.push(existing.id);
+        }
       });
 
-      await onSaveAttendanceBatch(recordsToSave);
+      if (recordsToDeleteIds.length > 0 && onDeleteAttendanceBatch) {
+        await onDeleteAttendanceBatch(recordsToDeleteIds);
+      }
+
+      if (recordsToSave.length > 0) {
+        await onSaveAttendanceBatch(recordsToSave);
+      }
+
       const className = classes.find((c) => c.id === selectedClassId)?.name || selectedClassId;
-      setSaveSuccessMessage(
-        `Absensi tanggal ${selectedDate} kelas ${className} berhasil disimpan!${
-          defaultHadirCount > 0 ? ` (${defaultHadirCount} murid tanpa tanda otomatis dihitung Hadir)` : ''
-        }`
-      );
+      const totalMarked = recordsToSave.length;
+      if (totalMarked === 0) {
+        setSaveSuccessMessage(`Presensi kelas ${className} tanggal ${selectedDate} telah dikosongkan.`);
+      } else {
+        const detailParts: string[] = [];
+        if (countH > 0) detailParts.push(`${countH} Hadir`);
+        if (countS > 0) detailParts.push(`${countS} Sakit`);
+        if (countI > 0) detailParts.push(`${countI} Izin`);
+        if (countA > 0) detailParts.push(`${countA} Alpa`);
+        setSaveSuccessMessage(
+          `Presensi tanggal ${selectedDate} kelas ${className} berhasil disimpan: ${detailParts.join(', ')} (${totalMarked} dari ${classStudents.length} murid).`
+        );
+      }
     } catch (err: any) {
       alert('Gagal menyimpan absensi: ' + err.message);
     } finally {
@@ -356,10 +390,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         {/* Helpful User Instruction Notice */}
         <div className="px-4 py-2 bg-blue-50/60 dark:bg-blue-950/30 border-b border-blue-100 dark:border-blue-900/40 text-[11px] text-blue-800 dark:text-blue-300 flex items-center justify-between flex-wrap gap-2">
           <span>
-            💡 <strong>Panduan:</strong> Klik tombol status (<strong>H / S / I / A</strong>) untuk memilih per murid. Klik kembali tombol yang aktif untuk membatalkan (unselect).
+            💡 <strong>Panduan:</strong> Klik tombol status (<strong>H / S / I / A</strong>) untuk menandai murid satu per satu. Klik kembali tombol yang aktif untuk membatalkan (kosongkan).
           </span>
           <span className="text-slate-500 dark:text-slate-400">
-            *Murid tanpa tanda otomatis dihitung <strong>Hadir</strong> saat disimpan.
+            Hanya murid yang ditandai yang akan disimpan. Gunakan <strong>"Hadirkan Semua"</strong> jika ingin mengisi cepat seluruh kelas.
           </span>
         </div>
 

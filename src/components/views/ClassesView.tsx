@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ClassItem, Student, AppSettings, NavigationMenu } from '../../types';
 import { Modal } from '../ui/Modal';
+import { normalizeClassKey } from '../../services/storage';
 
 interface ClassesViewProps {
   classes: ClassItem[];
@@ -101,7 +102,13 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
   };
 
   const handleDelete = async (cls: ClassItem) => {
-    const studentCount = students.filter((s) => s.classId === cls.id).length;
+    const studentCount = students.filter(
+      (s) =>
+        s.classId === cls.id ||
+        s.classId.toLowerCase() === cls.name.toLowerCase() ||
+        normalizeClassKey(s.classId) === normalizeClassKey(cls.name) ||
+        normalizeClassKey(s.classId) === normalizeClassKey(cls.id)
+    ).length;
     const confirmMsg =
       studentCount > 0
         ? `Hapus kelas "${cls.name}"? Terdapat ${studentCount} murid di kelas ini yang akan otomatis dipindahkan ke kelas aktif pertama agar data tidak hilang.`
@@ -271,8 +278,21 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {levelClasses.map((cls) => {
-                  const studentCount = students.filter((s) => s.classId === cls.id).length;
-                  const activeStudentCount = students.filter((s) => s.classId === cls.id && s.isActive).length;
+                  const studentCount = students.filter(
+                    (s) =>
+                      s.classId === cls.id ||
+                      s.classId.toLowerCase() === cls.name.toLowerCase() ||
+                      normalizeClassKey(s.classId) === normalizeClassKey(cls.name) ||
+                      normalizeClassKey(s.classId) === normalizeClassKey(cls.id)
+                  ).length;
+                  const activeStudentCount = students.filter(
+                    (s) =>
+                      s.isActive &&
+                      (s.classId === cls.id ||
+                        s.classId.toLowerCase() === cls.name.toLowerCase() ||
+                        normalizeClassKey(s.classId) === normalizeClassKey(cls.name) ||
+                        normalizeClassKey(s.classId) === normalizeClassKey(cls.id))
+                  ).length;
 
                   return (
                     <div

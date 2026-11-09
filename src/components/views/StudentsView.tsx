@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Student, ClassItem, AppSettings } from '../../types';
 import { Modal } from '../ui/Modal';
+import { normalizeClassKey, findMatchingClass } from '../../services/storage';
 
 interface StudentsViewProps {
   students: Student[];
@@ -83,7 +84,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
       const matchClass =
         selectedClass === 'all' ||
         s.classId === selectedClass ||
-        (targetClass && s.classId.toLowerCase() === targetClass.name.toLowerCase());
+        (targetClass && (
+          s.classId.toLowerCase() === targetClass.name.toLowerCase() ||
+          normalizeClassKey(s.classId) === normalizeClassKey(targetClass.name) ||
+          normalizeClassKey(s.classId) === normalizeClassKey(targetClass.id)
+        ));
       return matchSearch && matchClass;
     });
   }, [students, searchTerm, selectedClass, classes]);
@@ -200,10 +205,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
           const name = cols[2] || '';
           const gender = (cols[3]?.toUpperCase() === 'P' ? 'P' : 'L') as 'L' | 'P';
           
-          // Match class by name or fallback
+          // Match class by ID, name, or normalized key
           const rawClass = cols[4] || '';
-          const foundClass = classes.find((c) => c.name.toLowerCase() === rawClass.toLowerCase() || c.id === rawClass);
-          const classId = foundClass ? foundClass.id : (selectedClass !== 'all' ? selectedClass : classes[0]?.id || '');
+          const foundClass = findMatchingClass(rawClass, classes);
+          const classId = foundClass ? foundClass.id : (selectedClass !== 'all' ? selectedClass : classes[0]?.id || 'cls-1');
 
           parsed.push({
             id: `std-${Date.now()}-${i}`,
@@ -338,7 +343,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             <option value="all">Semua Kelas ({students.length})</option>
             {classes.map((cls) => {
               const count = students.filter(
-                (s) => s.classId === cls.id || s.classId.toLowerCase() === cls.name.toLowerCase()
+                (s) =>
+                  s.classId === cls.id ||
+                  s.classId.toLowerCase() === cls.name.toLowerCase() ||
+                  normalizeClassKey(s.classId) === normalizeClassKey(cls.name) ||
+                  normalizeClassKey(s.classId) === normalizeClassKey(cls.id)
               ).length;
               return (
                 <option key={cls.id} value={cls.id}>

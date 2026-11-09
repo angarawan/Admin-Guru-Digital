@@ -144,13 +144,243 @@ export async function saveSettings(settings: AppSettings): Promise<{ success: bo
 }
 
 // -------------------------------------------------------------
+// NORMALIZATION HELPERS FOR SPREADSHEETS & MANUAL ENTRIES
+// -------------------------------------------------------------
+
+/**
+ * Normalizes class identifiers for fuzzy matching across spaces, hyphens, prefixes, and casing
+ * (e.g. "XI 1", "XI-1", "xi-1", "cls-xi-1", "Kelas XI 1" -> "xi1")
+ */
+export function normalizeClassKey(str: string | undefined | null): string {
+  if (!str) return '';
+  let s = String(str).trim().toLowerCase();
+  s = s.replace(/^cls[-_]/, ''); // remove cls- prefix
+  s = s.replace(/^kelas\s*/, ''); // remove 'kelas' prefix
+  s = s.replace(/[^a-z0-9]/g, ''); // strip all non-alphanumeric (hyphens, spaces, dots)
+  return s;
+}
+
+/**
+ * Normalizes raw class objects from Google Spreadsheet, manual input, or CSV
+ * Supports common Indonesian headers: "Nama Kelas", "Kelas", "Rombel", "Tingkat", "Wali Kelas", "No"
+ */
+export function normalizeClassItem(raw: any, index: number = 0): ClassItem {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: `cls-${index + 1}`,
+      name: `Kelas ${index + 1}`,
+      level: 'X',
+    };
+  }
+
+  // 1. Extract Name
+  const rawName =
+    raw.name ||
+    raw['Nama Kelas'] ||
+    raw['Nama_Kelas'] ||
+    raw['nama_kelas'] ||
+    raw['Kelas'] ||
+    raw['kelas'] ||
+    raw['Rombel'] ||
+    raw['rombel'] ||
+    raw['Rombongan Belajar'] ||
+    raw['Nama'] ||
+    raw['nama'] ||
+    raw['ID'] ||
+    raw.id ||
+    `Kelas ${index + 1}`;
+
+  const name = String(rawName).trim();
+
+  // 2. Extract or Generate ID
+  let id = raw.id || raw['id'] || raw['ID'] || raw['Kode'] || raw['kode'] || raw['Kode Kelas'];
+  if (!id || typeof id !== 'string' || !id.trim() || id === 'undefined' || id === 'null') {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    id = slug ? `cls-${slug}` : `cls-${index + 1}`;
+  } else {
+    id = String(id).trim();
+  }
+
+  // 3. Extract Level (Tingkat)
+  let level = raw.level || raw['level'] || raw['Level'] || raw['Tingkat'] || raw['tingkat'] || raw['Tingkat Kelas'] || raw['Jenjang'];
+  if (!level || typeof level !== 'string' || !level.trim()) {
+    const upper = name.toUpperCase();
+    if (upper.startsWith('XII') || upper.includes('12')) {
+      level = 'XII';
+    } else if (upper.startsWith('XI') || upper.includes('11')) {
+      level = 'XI';
+    } else {
+      level = 'X';
+    }
+  } else {
+    level = String(level).trim().toUpperCase();
+    if (level === '10') level = 'X';
+    if (level === '11') level = 'XI';
+    if (level === '12') level = 'XII';
+  }
+
+  // 4. Extract Homeroom Teacher (Wali Kelas)
+  const homeroomTeacher =
+    raw.homeroomTeacher ||
+    raw['homeroomTeacher'] ||
+    raw['Wali Kelas'] ||
+    raw['wali_kelas'] ||
+    raw['Wali'] ||
+    raw['wali'] ||
+    raw['Guru Wali'] ||
+    undefined;
+
+  return {
+    id,
+    name,
+    level,
+    homeroomTeacher: homeroomTeacher ? String(homeroomTeacher).trim() : undefined,
+  };
+}
+
+/**
+ * Finds a matching class from a list using exact ID, exact Name, or fuzzy normalized key
+ */
+export function findMatchingClass(identifier: string | undefined | null, classes: ClassItem[]): ClassItem | undefined {
+  if (!identifier || classes.length === 0) return undefined;
+  const raw = String(identifier).trim();
+  const rawLower = raw.toLowerCase();
+  const norm = normalizeClassKey(raw);
+
+  // 1. Exact ID
+  const byId = classes.find((c) => c.id === raw);
+  if (byId) return byId;
+
+  // 2. Exact Name
+  const byName = classes.find((c) => c.name.toLowerCase() === rawLower);
+  if (byName) return byName;
+
+  // 3. Normalized ID or Name Match
+  const byNorm = classes.find((c) => normalizeClassKey(c.id) === norm || normalizeClassKey(c.name) === norm);
+  if (byNorm) return byNorm;
+
+  // 4. Legacy Demo mappings
+  const legacyMap: Record<string, string> = {
+    'xa': 'cls-1',
+    'xb': 'cls-2',
+    'ximipa1': 'cls-3',
+    'ximipa2': 'cls-4',
+    'xiimipa1': 'cls-5',
+    'x1': 'cls-1',
+    'x2': 'cls-2',
+    'xi1': 'cls-3',
+    'xi2': 'cls-4',
+    'xii1': 'cls-5',
+  };
+  const legacyTargetId = legacyMap[norm];
+  if (legacyTargetId) {
+    const legacyFound = classes.find((c) => c.id === legacyTargetId || normalizeClassKey(c.id) === normalizeClassKey(legacyTargetId));
+    if (legacyFound) return legacyFound;
+  }
+
+  return undefined;
+}
+
+/**
+ * Normalizes raw student objects from Google Spreadsheet, manual input, or CSV
+ * Guarantees a unique student ID, valid name, and correct class linkage
+ */
+export function normalizeStudentItem(raw: any, classes: ClassItem[], index: number = 0): Student {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: `std-${Date.now()}-${index}`,
+      nis: '',
+      nisn: '',
+      name: `Murid ${index + 1}`,
+      gender: 'L',
+      classId: classes[0]?.id || 'cls-1',
+      academicYear: '2024/2025',
+      isActive: true,
+    };
+  }
+
+  const rawNis = String(raw.nis || raw['NIS'] || raw['nis'] || raw['Nomor Induk'] || raw['No. Induk'] || '').trim();
+  const rawNisn = String(raw.nisn || raw['NISN'] || raw['nisn'] || '').trim();
+  const rawName = String(
+    raw.name ||
+    raw['Nama'] ||
+    raw['Nama Murid'] ||
+    raw['Nama Siswa'] ||
+    raw['Nama Lengkap'] ||
+    raw['nama'] ||
+    ''
+  ).trim();
+
+  // Guarantee unique, non-empty student ID so multiple students NEVER share an undefined or duplicate ID
+  let id = raw.id || raw['id'] || raw['ID'];
+  if (!id || typeof id !== 'string' || !id.trim() || id === 'undefined' || id === 'null') {
+    if (rawNis) {
+      id = `std-${rawNis}`;
+    } else if (rawName) {
+      const slug = rawName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 20);
+      id = `std-${slug}-${index + 1}`;
+    } else {
+      id = `std-${Date.now()}-${index + 1}`;
+    }
+  } else {
+    id = String(id).trim();
+  }
+
+  const rawGender = String(raw.gender || raw['Jenis Kelamin'] || raw['JK'] || raw['jk'] || raw['gender'] || 'L').trim().toUpperCase();
+  const gender: 'L' | 'P' = rawGender.startsWith('P') ? 'P' : 'L';
+
+  const rawClass = String(
+    raw.classId ||
+    raw['classId'] ||
+    raw['Kelas'] ||
+    raw['kelas'] ||
+    raw['Nama Kelas'] ||
+    raw['Rombel'] ||
+    raw['rombel'] ||
+    raw['ID Kelas'] ||
+    ''
+  ).trim();
+
+  let classId = rawClass;
+  if (rawClass) {
+    const matched = findMatchingClass(rawClass, classes);
+    if (matched) {
+      classId = matched.id;
+    } else {
+      // If student has a class name that isn't registered yet in classes, register it dynamically!
+      const newClass = normalizeClassItem({ name: rawClass }, classes.length);
+      classes.push(newClass);
+      setStored(STORAGE_KEYS.CLASSES, classes);
+      classId = newClass.id;
+    }
+  } else {
+    classId = classes[0]?.id || 'cls-1';
+  }
+
+  const academicYear = String(raw.academicYear || raw['academicYear'] || raw['Tahun Ajaran'] || '2024/2025').trim();
+  const isActive = raw.isActive !== undefined ? Boolean(raw.isActive && raw.isActive !== '0' && raw.isActive !== 'false') : true;
+
+  return {
+    id: String(id),
+    nis: rawNis,
+    nisn: rawNisn,
+    name: rawName || `Murid ${index + 1}`,
+    gender,
+    classId,
+    academicYear,
+    isActive,
+  };
+}
+
+// -------------------------------------------------------------
 // CLASSES
 // -------------------------------------------------------------
 export function getClasses(): ClassItem[] {
-  let list = getStored<ClassItem[]>(STORAGE_KEYS.CLASSES, DEFAULT_CLASSES);
-  
-  // Smart migration: if stored classes still contain old Matematika MIPA demo names, migrate them to PJOK standards
-  let migrated = false;
+  let rawList = getStored<any[]>(STORAGE_KEYS.CLASSES, DEFAULT_CLASSES);
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    rawList = DEFAULT_CLASSES;
+  }
+
   const oldDemoNames: Record<string, string> = {
     'X-A': 'X-1',
     'X-B': 'X-2',
@@ -159,39 +389,43 @@ export function getClasses(): ClassItem[] {
     'XII-MIPA 1': 'XII-1',
   };
 
-  list = list.map((c) => {
-    if (oldDemoNames[c.name]) {
-      migrated = true;
-      return { ...c, name: oldDemoNames[c.name] };
-    }
-    return c;
-  });
+  const seenIds = new Set<string>();
+  const list: ClassItem[] = [];
 
-  if (migrated) {
-    setStored(STORAGE_KEYS.CLASSES, list);
-  }
+  rawList.forEach((raw, idx) => {
+    const normalized = normalizeClassItem(raw, idx);
+    if (oldDemoNames[normalized.name]) {
+      normalized.name = oldDemoNames[normalized.name];
+    }
+    // Prevent duplicate IDs
+    if (!seenIds.has(normalized.id)) {
+      seenIds.add(normalized.id);
+      list.push(normalized);
+    }
+  });
 
   return list;
 }
 
 export async function saveClass(item: ClassItem): Promise<void> {
+  const normalized = normalizeClassItem(item);
   const list = getClasses();
-  const idx = list.findIndex((c) => c.id === item.id);
+  const idx = list.findIndex((c) => c.id === normalized.id);
   const oldItem = idx > -1 ? list[idx] : null;
 
   if (idx > -1) {
-    list[idx] = item;
+    list[idx] = normalized;
   } else {
-    list.push(item);
+    list.push(normalized);
   }
   setStored(STORAGE_KEYS.CLASSES, list);
 
   // If class name changed, propagate update to journals className if necessary
-  if (oldItem && oldItem.name !== item.name) {
+  if (oldItem && oldItem.name !== normalized.name) {
     const journals = getJournals();
     let jUpdated = false;
     journals.forEach((j) => {
-      if (j.classIds && j.classIds.includes(item.id)) {
+      if (j.classIds && j.classIds.includes(normalized.id)) {
         j.className = j.classIds.map((cid) => list.find((c) => c.id === cid)?.name || cid).join(', ');
         jUpdated = true;
       }
@@ -204,7 +438,7 @@ export async function saveClass(item: ClassItem): Promise<void> {
   const settings = getSettings();
   if (settings.appsScriptUrl) {
     notifySync({ isSyncing: true, statusText: 'Menyimpan kelas ke Spreadsheet...', isError: false });
-    await saveRowRemote(settings.appsScriptUrl, 'Kelas', item);
+    await saveRowRemote(settings.appsScriptUrl, 'Kelas', normalized);
     notifySync({
       isSyncing: false,
       statusText: 'Tersimpan di Google Spreadsheet',
@@ -246,66 +480,25 @@ export async function deleteClass(id: string, reassignToClassId?: string): Promi
 // -------------------------------------------------------------
 export function getStudents(): Student[] {
   const classes = getClasses();
-  let list = getStored<Student[]>(STORAGE_KEYS.STUDENTS, DEFAULT_STUDENTS);
-  if (!Array.isArray(list) || list.length === 0) {
-    list = DEFAULT_STUDENTS;
+  let rawList = getStored<any[]>(STORAGE_KEYS.STUDENTS, DEFAULT_STUDENTS);
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    rawList = DEFAULT_STUDENTS;
   }
 
-  // Auto-heal class references:
-  // If student.classId is an old demo name like 'XI-MIPA 1' or 'X-A', or class name like 'X-1', map to actual class ID
-  const classByName = new Map<string, string>();
-  classes.forEach((c) => {
-    classByName.set(c.name.toLowerCase(), c.id);
-    classByName.set(c.id.toLowerCase(), c.id);
+  const seenIds = new Set<string>();
+  const list: Student[] = [];
+
+  rawList.forEach((raw, idx) => {
+    const s = normalizeStudentItem(raw, classes, idx);
+    let finalId = s.id;
+    let counter = 1;
+    while (seenIds.has(finalId)) {
+      finalId = `${s.id}-${counter++}`;
+    }
+    s.id = finalId;
+    seenIds.add(finalId);
+    list.push(s);
   });
-
-  const legacyDemoClassMap: Record<string, string> = {
-    'x-a': 'cls-1',
-    'x-b': 'cls-2',
-    'xi-mipa 1': 'cls-3',
-    'xi-mipa 2': 'cls-4',
-    'xii-mipa 1': 'cls-5',
-    'x-1': 'cls-1',
-    'x-2': 'cls-2',
-    'xi-1': 'cls-3',
-    'xi-2': 'cls-4',
-    'xii-1': 'cls-5',
-  };
-
-  const validClassIds = new Set(classes.map((c) => c.id));
-  const defaultClassId = classes[0]?.id || 'cls-1';
-
-  let changed = false;
-  list = list.map((s) => {
-    const rawClass = (s.classId || '').trim().toLowerCase();
-    // 1. If valid class ID already, keep it
-    if (validClassIds.has(s.classId)) {
-      return s;
-    }
-    // 2. If matches a class name (e.g. 'X-1', 'XI-1')
-    if (classByName.has(rawClass)) {
-      changed = true;
-      return { ...s, classId: classByName.get(rawClass)! };
-    }
-    // 3. If matches legacy demo class name
-    if (legacyDemoClassMap[rawClass]) {
-      const targetId = legacyDemoClassMap[rawClass];
-      if (validClassIds.has(targetId)) {
-        changed = true;
-        return { ...s, classId: targetId };
-      }
-    }
-    // 4. Otherwise assign to defaultClassId
-    if (classes.length > 0) {
-      changed = true;
-      return { ...s, classId: defaultClassId };
-    }
-    return s;
-  });
-
-  if (changed) {
-    setStored(STORAGE_KEYS.STUDENTS, list);
-  }
 
   return list;
 }
@@ -333,40 +526,25 @@ export async function reassignStudentsClass(fromClassId: string, toClassId: stri
  * Ensures no orphan class IDs exist in any feature.
  */
 export async function syncAllClassesWithData(): Promise<{ studentsSynced: number; journalsSynced: number }> {
-  const classes = getClasses();
+  let classes = getClasses();
   if (classes.length === 0) return { studentsSynced: 0, journalsSynced: 0 };
   const validClassIds = new Set(classes.map((c) => c.id));
   const fallbackClassId = classes[0].id;
-
-  const classByName = new Map<string, string>();
-  classes.forEach((c) => {
-    classByName.set(c.name.toLowerCase(), c.id);
-  });
-
-  const legacyDemoClassMap: Record<string, string> = {
-    'x-a': 'cls-1',
-    'x-b': 'cls-2',
-    'xi-mipa 1': 'cls-3',
-    'xi-mipa 2': 'cls-4',
-    'xii-mipa 1': 'cls-5',
-    'x-1': 'cls-1',
-    'x-2': 'cls-2',
-    'xi-1': 'cls-3',
-    'xi-2': 'cls-4',
-    'xii-1': 'cls-5',
-  };
 
   // 1. Sync Students
   const students = getStudents();
   let studentsSynced = 0;
   students.forEach((s) => {
-    const rawClass = (s.classId || '').trim().toLowerCase();
     if (!validClassIds.has(s.classId)) {
-      if (classByName.has(rawClass)) {
-        s.classId = classByName.get(rawClass)!;
+      const matched = findMatchingClass(s.classId, classes);
+      if (matched) {
+        s.classId = matched.id;
         studentsSynced++;
-      } else if (legacyDemoClassMap[rawClass] && validClassIds.has(legacyDemoClassMap[rawClass])) {
-        s.classId = legacyDemoClassMap[rawClass];
+      } else if (s.classId && s.classId.trim()) {
+        const newClass = normalizeClassItem({ name: s.classId }, classes.length);
+        classes.push(newClass);
+        validClassIds.add(newClass.id);
+        s.classId = newClass.id;
         studentsSynced++;
       } else {
         s.classId = fallbackClassId;
@@ -374,7 +552,9 @@ export async function syncAllClassesWithData(): Promise<{ studentsSynced: number
       }
     }
   });
+
   if (studentsSynced > 0) {
+    setStored(STORAGE_KEYS.CLASSES, classes);
     setStored(STORAGE_KEYS.STUDENTS, students);
   }
 
@@ -998,17 +1178,63 @@ export async function syncAllFromRemote(): Promise<{ success: boolean; message: 
     const res = await fetchAllRemoteData(settings.appsScriptUrl);
     if (res.status === 'success' && res.data) {
       const data = res.data;
-      if (Array.isArray(data['Kelas']) && data['Kelas'].length > 0) setStored(STORAGE_KEYS.CLASSES, data['Kelas']);
-      if (Array.isArray(data['Jam_Pelajaran']) && data['Jam_Pelajaran'].length > 0) setStored(STORAGE_KEYS.PERIODS, data['Jam_Pelajaran']);
-      if (Array.isArray(data['Data_Murid']) && data['Data_Murid'].length > 0) setStored(STORAGE_KEYS.STUDENTS, data['Data_Murid']);
-      if (Array.isArray(data['Jadwal_Mengajar']) && data['Jadwal_Mengajar'].length > 0) setStored(STORAGE_KEYS.SCHEDULES, data['Jadwal_Mengajar']);
-      if (Array.isArray(data['Absensi']) && data['Absensi'].length > 0) setStored(STORAGE_KEYS.ATTENDANCE, data['Absensi']);
-      if (Array.isArray(data['Jurnal_Mengajar']) && data['Jurnal_Mengajar'].length > 0) setStored(STORAGE_KEYS.JOURNALS, data['Jurnal_Mengajar']);
-      if (Array.isArray(data['Nilai_Pengetahuan']) && data['Nilai_Pengetahuan'].length > 0) setStored(STORAGE_KEYS.KNOWLEDGE, data['Nilai_Pengetahuan']);
-      if (Array.isArray(data['Nilai_Keterampilan']) && data['Nilai_Keterampilan'].length > 0) setStored(STORAGE_KEYS.SKILLS, data['Nilai_Keterampilan']);
-      if (Array.isArray(data['Nilai_Sikap']) && data['Nilai_Sikap'].length > 0) setStored(STORAGE_KEYS.ATTITUDES, data['Nilai_Sikap']);
-      if (Array.isArray(data['Jurnal_Pendampingan']) && data['Jurnal_Pendampingan'].length > 0) setStored(STORAGE_KEYS.MENTORING, data['Jurnal_Pendampingan']);
-      if (Array.isArray(data['Kartu_Refleksi']) && data['Kartu_Refleksi'].length > 0) setStored(STORAGE_KEYS.REFLECTIONS, data['Kartu_Refleksi']);
+
+      // Helper to find sheet by multiple alternative names (case-insensitive / spacing)
+      const findSheet = (names: string[]): any[] | null => {
+        for (const key of Object.keys(data)) {
+          const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+          for (const n of names) {
+            const cleanTarget = n.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanKey === cleanTarget && Array.isArray(data[key]) && data[key].length > 0) {
+              return data[key];
+            }
+          }
+        }
+        return null;
+      };
+
+      // 1. Classes: normalize immediately
+      const classesRaw = findSheet(['Kelas', 'Data_Kelas', 'Data Kelas', 'Daftar_Kelas', 'Daftar Kelas', 'Rombel']);
+      if (classesRaw) {
+        const normalizedClasses = classesRaw.map((c, i) => normalizeClassItem(c, i));
+        setStored(STORAGE_KEYS.CLASSES, normalizedClasses);
+      }
+
+      // 2. Students: normalize immediately with valid classes
+      const studentsRaw = findSheet(['Data_Murid', 'Data Murid', 'Murid', 'Siswa', 'Data_Siswa', 'Data Siswa', 'Daftar_Siswa']);
+      if (studentsRaw) {
+        const curClasses = getClasses();
+        const normalizedStudents = studentsRaw.map((s, i) => normalizeStudentItem(s, curClasses, i));
+        setStored(STORAGE_KEYS.STUDENTS, normalizedStudents);
+      }
+
+      // 3. Other sheets
+      const jamRaw = findSheet(['Jam_Pelajaran', 'Jam Pelajaran', 'Jam']);
+      if (jamRaw) setStored(STORAGE_KEYS.PERIODS, jamRaw);
+
+      const jadwalRaw = findSheet(['Jadwal_Mengajar', 'Jadwal Mengajar', 'Jadwal']);
+      if (jadwalRaw) setStored(STORAGE_KEYS.SCHEDULES, jadwalRaw);
+
+      const absensiRaw = findSheet(['Absensi', 'Presensi', 'Data_Absensi']);
+      if (absensiRaw) setStored(STORAGE_KEYS.ATTENDANCE, absensiRaw);
+
+      const jurnalRaw = findSheet(['Jurnal_Mengajar', 'Jurnal Mengajar', 'Jurnal']);
+      if (jurnalRaw) setStored(STORAGE_KEYS.JOURNALS, jurnalRaw);
+
+      const knowRaw = findSheet(['Nilai_Pengetahuan', 'Nilai Pengetahuan', 'Pengetahuan']);
+      if (knowRaw) setStored(STORAGE_KEYS.KNOWLEDGE, knowRaw);
+
+      const skillRaw = findSheet(['Nilai_Keterampilan', 'Nilai Keterampilan', 'Keterampilan']);
+      if (skillRaw) setStored(STORAGE_KEYS.SKILLS, skillRaw);
+
+      const attRaw = findSheet(['Nilai_Sikap', 'Nilai Sikap', 'Sikap']);
+      if (attRaw) setStored(STORAGE_KEYS.ATTITUDES, attRaw);
+
+      const mentRaw = findSheet(['Jurnal_Pendampingan', 'Jurnal Pendampingan', 'Pendampingan']);
+      if (mentRaw) setStored(STORAGE_KEYS.MENTORING, mentRaw);
+
+      const refRaw = findSheet(['Kartu_Refleksi', 'Kartu Refleksi', 'Refleksi']);
+      if (refRaw) setStored(STORAGE_KEYS.REFLECTIONS, refRaw);
 
       notifySync({
         isSyncing: false,

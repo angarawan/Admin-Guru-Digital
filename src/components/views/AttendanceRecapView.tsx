@@ -13,6 +13,7 @@ import {
   AttendanceRecord,
   AppSettings,
 } from '../../types';
+import { normalizeClassKey } from '../../services/storage';
 
 interface AttendanceRecapViewProps {
   students: Student[];
@@ -51,22 +52,34 @@ export const AttendanceRecapView: React.FC<AttendanceRecapViewProps> = ({
 
   const activeClass = classes.find((c) => c.id === selectedClassId);
 
-  // Filter students with class name fallback
+  // Filter students with class name and normalized key fallback
   const classStudents = useMemo(() => {
     return students
       .filter((s) => {
         if (!s.isActive) return false;
         if (s.classId === selectedClassId) return true;
-        if (activeClass && s.classId.toLowerCase() === activeClass.name.toLowerCase()) return true;
+        if (activeClass) {
+          if (s.classId.toLowerCase() === activeClass.name.toLowerCase()) return true;
+          return (
+            normalizeClassKey(s.classId) === normalizeClassKey(activeClass.name) ||
+            normalizeClassKey(s.classId) === normalizeClassKey(activeClass.id)
+          );
+        }
         return false;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
   }, [students, selectedClassId, activeClass]);
 
   // Filter attendance records by range, class, and semester
   const filteredAttendance = useMemo(() => {
     return attendance.filter((a) => {
-      const matchClass = a.classId === selectedClassId;
+      const matchClass =
+        a.classId === selectedClassId ||
+        (activeClass && (
+          a.classId.toLowerCase() === activeClass.name.toLowerCase() ||
+          normalizeClassKey(a.classId) === normalizeClassKey(activeClass.name) ||
+          normalizeClassKey(a.classId) === normalizeClassKey(activeClass.id)
+        ));
       const matchDate = (!startDate || a.date >= startDate) && (!endDate || a.date <= endDate);
       const matchYear = !academicYear || a.academicYear === academicYear;
       const matchSem = !semester || a.semester === semester;

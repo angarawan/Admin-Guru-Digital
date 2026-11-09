@@ -14,6 +14,7 @@ import {
   AttitudeAssessment,
   AppSettings,
 } from '../../types';
+import { normalizeClassKey } from '../../services/storage';
 
 interface AttitudeAssessmentViewProps {
   students: Student[];
@@ -86,10 +87,16 @@ export const AttitudeAssessmentView: React.FC<AttitudeAssessmentViewProps> = ({
       .filter((s) => {
         if (!s.isActive) return false;
         if (s.classId === selectedClassId) return true;
-        if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+        if (curCls) {
+          if (s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+          return (
+            normalizeClassKey(s.classId) === normalizeClassKey(curCls.name) ||
+            normalizeClassKey(s.classId) === normalizeClassKey(curCls.id)
+          );
+        }
         return false;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
   }, [students, selectedClassId, classes]);
 
   // Compute category label from average score

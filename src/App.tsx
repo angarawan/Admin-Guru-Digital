@@ -244,6 +244,11 @@ export default function App() {
     setAttendance(getAttendance());
   };
 
+  const handleDeleteAttendanceBatch = async (ids: string[]) => {
+    await deleteAttendanceBatch(ids);
+    setAttendance(getAttendance());
+  };
+
   const handleSaveJournal = async (journal: TeachingJournal) => {
     await saveJournal(journal);
     setJournals(getJournals());
@@ -440,6 +445,7 @@ export default function App() {
               settings={settings}
               existingAttendance={attendance}
               onSaveAttendanceBatch={handleSaveAttendanceBatch}
+              onDeleteAttendanceBatch={handleDeleteAttendanceBatch}
             />
           )}
 

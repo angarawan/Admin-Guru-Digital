@@ -31,6 +31,7 @@ import {
   AttendanceRecord,
   AppSettings,
 } from '../../types';
+import { normalizeClassKey } from '../../services/storage';
 
 interface SkillAssessmentViewProps {
   students: Student[];
@@ -142,17 +143,23 @@ export const SkillAssessmentView: React.FC<SkillAssessmentViewProps> = ({
   // Filter tab for student selection in Langkah 2: 'ungraded' (default) | 'graded' | 'all'
   const [filterGradedStatus, setFilterGradedStatus] = useState<'ungraded' | 'all' | 'graded'>('ungraded');
 
-  // All active students for selected class (sorted alphabetically with class name fallback)
+  // All active students for selected class (sorted alphabetically with class name & normalized fallback)
   const classStudents = useMemo(() => {
     const curCls = classes.find((c) => c.id === selectedClassId);
     return students
       .filter((s) => {
         if (!s.isActive) return false;
         if (s.classId === selectedClassId) return true;
-        if (curCls && s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+        if (curCls) {
+          if (s.classId.toLowerCase() === curCls.name.toLowerCase()) return true;
+          return (
+            normalizeClassKey(s.classId) === normalizeClassKey(curCls.name) ||
+            normalizeClassKey(s.classId) === normalizeClassKey(curCls.id)
+          );
+        }
         return false;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
   }, [students, selectedClassId, classes]);
 
   // Set of student IDs already evaluated & saved for this class, topic, and practice type

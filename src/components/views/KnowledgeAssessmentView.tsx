@@ -23,6 +23,7 @@ import {
   KnowledgeAssessment,
   AppSettings,
 } from '../../types';
+import { normalizeClassKey } from '../../services/storage';
 
 interface KnowledgeAssessmentViewProps {
   students: Student[];
@@ -105,16 +106,22 @@ export const KnowledgeAssessmentView: React.FC<KnowledgeAssessmentViewProps> = (
     return classes.find((c) => c.id === selectedClassId);
   }, [classes, selectedClassId]);
 
-  // Active students for selected class with name fallback
+  // Active students for selected class with name and normalized key fallback
   const classStudents = useMemo(() => {
     return students
       .filter((s) => {
         if (!s.isActive) return false;
         if (s.classId === selectedClassId) return true;
-        if (currentClass && s.classId.toLowerCase() === currentClass.name.toLowerCase()) return true;
+        if (currentClass) {
+          if (s.classId.toLowerCase() === currentClass.name.toLowerCase()) return true;
+          return (
+            normalizeClassKey(s.classId) === normalizeClassKey(currentClass.name) ||
+            normalizeClassKey(s.classId) === normalizeClassKey(currentClass.id)
+          );
+        }
         return false;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
   }, [students, selectedClassId, currentClass]);
 
   // Load existing saved scores when class, topic, or assessmentType changes
